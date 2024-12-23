@@ -15,6 +15,8 @@ export class MangaReaderView extends ItemView {
 	private container: HTMLDivElement;
 	private thumbnailBar: HTMLDivElement;
 	private pageInfo: HTMLDivElement;
+	private zipInstance: JSZip | null = null;  // 缓存 ZIP 实例
+	private currentImageUrl: string | null = null;  // 跟踪当前图片 URL
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -122,59 +124,64 @@ export class MangaReaderView extends ItemView {
 	}
 
 	private async updateThumbnails() {
-		if (!this.currentFile || !this.thumbnailBar) return;
+		if (!this.zipInstance || !this.thumbnailBar) return;
 
 		const thumbnailContainer = this.thumbnailBar.querySelector('.thumbnail-container');
 		if (!thumbnailContainer) return;
 
-		// 清空现有缩略图
 		while (thumbnailContainer.firstChild) {
-			thumbnailContainer.removeChild(thumbnailContainer.firstChild);
+			const firstChild = thumbnailContainer.firstChild;
+			if (firstChild instanceof HTMLElement) {  // 添加类型检查
+				const img = firstChild.querySelector('img');
+				if (img && img.src) {
+					URL.revokeObjectURL(img.src);
+				}
+			}
+			thumbnailContainer.removeChild(firstChild);
 		}
 
-		// 更新页码信息
-		if (this.pageInfo) {
-			this.pageInfo.textContent = `${this.currentIndex + 1} / ${this.images.length}`;
-			this.pageInfo.style.display = 'block'; // 确保页码信息可见
-		}
+		this.pageInfo.textContent = `${this.currentIndex + 1} / ${this.images.length}`;
 
-		// 计算要显示的缩略图范围
 		const start = Math.max(0, this.currentIndex - 3);
 		const end = Math.min(this.images.length - 1, this.currentIndex + 5);
 
-		// 加载并显示缩略图
+		// 使用 Promise.all 并行加载缩略图
+		const thumbnailPromises = [];
 		for (let i = start; i <= end; i++) {
-			const thumbContainer = thumbnailContainer.createEl('div', {
-				cls: 'thumbnail-wrapper'
-			});
+			thumbnailPromises.push(this.createThumbnail(i, thumbnailContainer));
+		}
 
-			const thumb = thumbContainer.createEl('img', {
-				cls: 'thumbnail' + (i === this.currentIndex ? ' current' : '')
-			});
+		await Promise.all(thumbnailPromises);
+	}
 
-			try {
-				const zip = new JSZip();
-				const zipContent = await zip.loadAsync(this.currentFile);
-				const imageFile = zipContent.file(this.images[i]);
+	private async createThumbnail(index: number, container: Element) {
+		const thumbContainer = container.createEl('div', {
+			cls: 'thumbnail-wrapper'
+		});
 
+		const thumb = thumbContainer.createEl('img', {
+			cls: 'thumbnail' + (index === this.currentIndex ? ' current' : '')
+		});
+
+		try {
+			if (this.zipInstance) {
+				const imageFile = this.zipInstance.file(this.images[index]);
 				if (imageFile) {
 					const blob = await imageFile.async('blob');
 					const url = URL.createObjectURL(blob);
 					thumb.src = url;
 
-					// 清理URL
 					thumb.onload = () => {
 						URL.revokeObjectURL(url);
 					};
 
-					// 添加点击事件
 					thumbContainer.addEventListener('click', () => {
-						this.showImage(i);
+						this.showImage(index);
 					});
 				}
-			} catch (error) {
-				console.error('Error loading thumbnail:', error);
 			}
+		} catch (error) {
+			console.error('Error loading thumbnail:', error);
 		}
 	}
 
@@ -254,32 +261,33 @@ export class MangaReaderView extends ItemView {
 
 	async showImage(index: number) {
 		console.log("Showing image at index:", index);
-		if (!this.currentFile || index < 0 || index >= this.images.length) {
+		if (!this.zipInstance || !this.currentFile || index < 0 || index >= this.images.length) {
 			console.log("Invalid image index or no file loaded");
 			return;
 		}
 
 		try {
-			const zip = new JSZip();
-			const zipContent = await zip.loadAsync(this.currentFile);
-			const imageFileName = this.images[index];
-			const imageFile = zipContent.file(imageFileName);
-
+			const imageFile = this.zipInstance.file(this.images[index]);
 			if (imageFile) {
+				// 清理旧的 URL
+				if (this.currentImageUrl) {
+					URL.revokeObjectURL(this.currentImageUrl);
+					this.currentImageUrl = null;
+				}
+
+				const imageFileName = this.images[index];
 				console.log("Loading image:", imageFileName);
+
 				// 存储blob数据以供复制使用
 				const blob = await imageFile.async('blob');
 				this.currentBlob = blob;
-				const url = URL.createObjectURL(blob);
-
-				// 清理之前的URL
-				if (this.imageEl.src) {
-					URL.revokeObjectURL(this.imageEl.src);
-				}
-
-				this.imageEl.src = url;
+				this.currentImageUrl = URL.createObjectURL(blob);
+				this.imageEl.src = this.currentImageUrl;
 				this.currentIndex = index;
 				console.log("Image loaded successfully");
+
+				// 延迟更新缩略图，避免同时加载太多图片
+				setTimeout(() => this.updateThumbnails(), 100);
 			} else {
 				console.log("Image file not found in zip");
 				this.imageEl.src = '';
@@ -300,33 +308,36 @@ export class MangaReaderView extends ItemView {
 	async loadManga(file: File) {
 		console.log("Loading manga file:", file.name);
 		try {
-			const zip = new JSZip();
-			const zipContent = await zip.loadAsync(file);
-			console.log("Zip content loaded:", Object.keys(zipContent.files).length, "files found");
+			// 清理旧的 ZIP 实例
+			this.zipInstance = new JSZip();
+			if (this.zipInstance) {
+				const zipContent = await this.zipInstance.loadAsync(file);
+				console.log("Zip content loaded:", Object.keys(zipContent.files).length, "files found");
 
-			// 获取所有图片文件并排序
-			this.images = Object.keys(zipContent.files)
-				.filter(filename => {
-					const isImage = filename.match(/\.(jpg|jpeg|png|gif|webp)$/i);
-					const isNotDir = !zipContent.files[filename].dir;
-					console.log("File:", filename, "isImage:", !!isImage, "isNotDir:", isNotDir);
-					return isImage && isNotDir;
-				})
-				.sort((a, b) => {
-					const numA = parseInt(a.match(/\d+/)?.[0] || '0');
-					const numB = parseInt(b.match(/\d+/)?.[0] || '0');
-					return numA - numB;
-				});
+				// 获取所有图片文件并排序
+				this.images = Object.keys(zipContent.files)
+					.filter(filename => {
+						const isImage = filename.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+						const isNotDir = !zipContent.files[filename].dir;
+						console.log("File:", filename, "isImage:", !!isImage, "isNotDir:", isNotDir);
+						return isImage && isNotDir;
+					})
+					.sort((a, b) => {
+						const numA = parseInt(a.match(/\d+/)?.[0] || '0');
+						const numB = parseInt(b.match(/\d+/)?.[0] || '0');
+						return numA - numB;
+					});
 
-			console.log("Filtered image files:", this.images);
+				console.log("Filtered image files:", this.images);
 
-			// 显示第一张图片
-			if (this.images.length > 0) {
-				await this.showImage(0);
-			} else {
-				console.log("No images found in zip file");
-				// 显示错误信息
-				this.containerEl.children[1].setText('No images found in the ZIP file');
+				// 显示第一张图片
+				if (this.images.length > 0) {
+					await this.showImage(0);
+				} else {
+					console.log("No images found in zip file");
+					// 显示错误信息
+					this.containerEl.children[1].setText('No images found in the ZIP file');
+				}
 			}
 		} catch (error) {
 			console.error('Error loading manga:', error);
@@ -345,5 +356,14 @@ export class MangaReaderView extends ItemView {
 		if (this.currentIndex < this.images.length - 1) {
 			this.showImage(this.currentIndex + 1);
 		}
+	}
+
+	async onunload() {
+		// 清理资源
+		if (this.currentImageUrl) {
+			URL.revokeObjectURL(this.currentImageUrl);
+		}
+		this.zipInstance = null;
+		this.currentBlob = null;
 	}
 }
