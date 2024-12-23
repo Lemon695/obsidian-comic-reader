@@ -12,6 +12,7 @@ export class MangaReaderView extends ItemView {
 	private currentFile: File | null = null;
 	private imageEl: HTMLImageElement;
 	private currentBlob: Blob | null = null; // 存储当前图片的Blob数据
+	private container: HTMLDivElement;
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -37,27 +38,53 @@ export class MangaReaderView extends ItemView {
 
 	async onOpen(): Promise<void> {
 		console.log("onOpen called");
-		const container = this.containerEl.children[1];
-		container.empty();
-		container.addClass('manga-reader-container');
+		const contentEl = this.containerEl.children[1];
+		if (!(contentEl instanceof HTMLElement)) {
+			throw new Error("Invalid container element");
+		}
 
-		this.imageEl = container.createEl('img', {
+		// 清空容器
+		while (contentEl.firstChild) {
+			contentEl.removeChild(contentEl.firstChild);
+		}
+
+		this.container = (this.containerEl.children[1] as HTMLDivElement);
+		this.container.addClass('manga-reader-container');
+		this.container.setAttribute('tabindex', '0');
+
+		this.imageEl = this.container.createEl('img', {
 			cls: 'manga-reader-image'
 		});
 
-		// 添加右键菜单事件监听
+		// 监听容器的键盘事件
+		this.registerDomEvent(this.container, 'keydown', (evt: KeyboardEvent) => {
+			if (evt.key === 'ArrowLeft') {
+				evt.preventDefault();
+				this.previousPage();
+			} else if (evt.key === 'ArrowRight') {
+				evt.preventDefault();
+				this.nextPage();
+			}
+		});
+
+		// 修复事件注册方式
+		this.registerEvent(
+			this.app.workspace.on('active-leaf-change', (leaf) => {
+				if (leaf && leaf.view === this) {
+					this.container.focus();
+				}
+			})
+		);
+
+		// 添加鼠标进入时自动聚焦
+		this.registerDomEvent(this.container, 'mouseenter', () => {
+			this.container.focus();
+		});
+
+		// 右键菜单事件监听
 		this.registerDomEvent(this.imageEl, 'contextmenu', (evt: MouseEvent) => {
 			evt.preventDefault();
 			this.showContextMenu(evt);
-		});
-
-		// 键盘事件监听保持不变
-		this.registerDomEvent(document, 'keydown', (evt: KeyboardEvent) => {
-			if (evt.key === 'ArrowLeft') {
-				this.previousPage();
-			} else if (evt.key === 'ArrowRight') {
-				this.nextPage();
-			}
 		});
 
 		if (this.currentFile) {
