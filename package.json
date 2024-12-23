@@ -1,14 +1,22 @@
 {
-	"name": "obsidian-sample-plugin",
+	"name": "obsidian-manga-reader",
 	"version": "1.0.0",
-	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
+	"description": "A manga reader plugin for Obsidian that can read images directly from zip files",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-		"version": "node version-bump.mjs && git add manifest.json versions.json"
+		"version": "node version-bump.mjs && git add manifest.json versions.json",
+		"lint": "eslint . --ext .ts",
+		"lint:fix": "eslint . --ext .ts --fix"
 	},
-	"keywords": [],
+	"keywords": [
+		"obsidian",
+		"manga",
+		"reader",
+		"comic",
+		"zip"
+	],
 	"author": "",
 	"license": "MIT",
 	"devDependencies": {
@@ -19,6 +27,8 @@
 		"esbuild": "0.17.3",
 		"obsidian": "latest",
 		"tslib": "2.4.0",
-		"typescript": "4.7.4"
+		"typescript": "4.7.4",
+		"jszip": "^3.10.1",
+		"@types/jszip": "^3.4.1"
 	}
 }
