@@ -1,7 +1,7 @@
 // main.ts
 import {Plugin} from 'obsidian';
 import {MANGA_VIEW_TYPE} from "./constants";
-import {MangaReaderView} from "./mangaReaderView";
+import {MangaReaderView} from "./manga-reader-view";
 import './types';
 
 export default class MangaReaderPlugin extends Plugin {
