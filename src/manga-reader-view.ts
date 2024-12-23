@@ -13,6 +13,8 @@ export class MangaReaderView extends ItemView {
 	private imageEl: HTMLImageElement;
 	private currentBlob: Blob | null = null; // 存储当前图片的Blob数据
 	private container: HTMLDivElement;
+	private thumbnailBar: HTMLDivElement;
+	private pageInfo: HTMLDivElement;
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -56,6 +58,33 @@ export class MangaReaderView extends ItemView {
 			cls: 'manga-reader-image'
 		});
 
+		// 创建缩略图栏容器
+		this.thumbnailBar = this.container.createEl('div', {
+			cls: 'thumbnail-bar'
+		});
+
+		// 创建页码信息
+		this.pageInfo = this.thumbnailBar.createEl('div', {
+			cls: 'page-info'
+		});
+
+		// 创建缩略图容器
+		const thumbnailContainer = this.thumbnailBar.createEl('div', {
+			cls: 'thumbnail-container'
+		});
+
+		// 添加鼠标移动检测
+		this.registerDomEvent(this.container, 'mousemove', (e: MouseEvent) => {
+			const containerHeight = this.container.clientHeight;
+			const threshold = containerHeight - 150; // 距离底部150px时显示
+
+			if (e.clientY > threshold) {
+				this.thumbnailBar.addClass('show');
+			} else {
+				this.thumbnailBar.removeClass('show');
+			}
+		});
+
 		// 监听容器的键盘事件
 		this.registerDomEvent(this.container, 'keydown', (evt: KeyboardEvent) => {
 			if (evt.key === 'ArrowLeft') {
@@ -89,6 +118,63 @@ export class MangaReaderView extends ItemView {
 
 		if (this.currentFile) {
 			await this.loadManga(this.currentFile);
+		}
+	}
+
+	private async updateThumbnails() {
+		if (!this.currentFile || !this.thumbnailBar) return;
+
+		const thumbnailContainer = this.thumbnailBar.querySelector('.thumbnail-container');
+		if (!thumbnailContainer) return;
+
+		// 清空现有缩略图
+		while (thumbnailContainer.firstChild) {
+			thumbnailContainer.removeChild(thumbnailContainer.firstChild);
+		}
+
+		// 更新页码信息
+		if (this.pageInfo) {
+			this.pageInfo.textContent = `${this.currentIndex + 1} / ${this.images.length}`;
+			this.pageInfo.style.display = 'block'; // 确保页码信息可见
+		}
+
+		// 计算要显示的缩略图范围
+		const start = Math.max(0, this.currentIndex - 3);
+		const end = Math.min(this.images.length - 1, this.currentIndex + 5);
+
+		// 加载并显示缩略图
+		for (let i = start; i <= end; i++) {
+			const thumbContainer = thumbnailContainer.createEl('div', {
+				cls: 'thumbnail-wrapper'
+			});
+
+			const thumb = thumbContainer.createEl('img', {
+				cls: 'thumbnail' + (i === this.currentIndex ? ' current' : '')
+			});
+
+			try {
+				const zip = new JSZip();
+				const zipContent = await zip.loadAsync(this.currentFile);
+				const imageFile = zipContent.file(this.images[i]);
+
+				if (imageFile) {
+					const blob = await imageFile.async('blob');
+					const url = URL.createObjectURL(blob);
+					thumb.src = url;
+
+					// 清理URL
+					thumb.onload = () => {
+						URL.revokeObjectURL(url);
+					};
+
+					// 添加点击事件
+					thumbContainer.addEventListener('click', () => {
+						this.showImage(i);
+					});
+				}
+			} catch (error) {
+				console.error('Error loading thumbnail:', error);
+			}
 		}
 	}
 
@@ -206,6 +292,9 @@ export class MangaReaderView extends ItemView {
 			this.imageEl.alt = 'Error loading image';
 			this.currentBlob = null;
 		}
+
+		// 在成功加载图片后更新缩略图
+		await this.updateThumbnails();
 	}
 
 	async loadManga(file: File) {

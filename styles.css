@@ -1,8 +1,101 @@
-/*
+/* styles.css */
 
-This CSS file will be included with your plugin, and
-available in the app when your plugin is enabled.
+/* 主容器样式 */
+.manga-reader-container {
+	position: relative;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	height: 100%;
+	outline: none;
+}
 
-If your plugin does not need CSS, delete this file.
+.manga-reader-image {
+	max-width: 100%;
+	max-height: 100vh;
+	display: block;
+	margin: 0 auto;
+	object-fit: contain;
+}
 
-*/
+/* 缩略图容器样式 */
+.thumbnail-container {
+	display: flex;
+	gap: 8px;
+	justify-content: center;
+	align-items: center;
+	width: 100%;
+	overflow-x: auto;
+	padding: 0 10px;
+}
+
+/* 隐藏滚动条但保持功能 */
+.thumbnail-container::-webkit-scrollbar {
+	height: 0;
+	width: 0;
+}
+
+/* 缩略图包装器样式 */
+.thumbnail-wrapper {
+	cursor: pointer;
+	border: 2px solid transparent;
+	transition: border-color 0.2s ease;
+	flex-shrink: 0;
+}
+
+.thumbnail-wrapper:hover {
+	border-color: var(--interactive-accent);
+}
+
+/* 缩略图样式 */
+.thumbnail {
+	width: 60px;
+	height: 80px;
+	object-fit: cover;
+	border-radius: 4px;
+}
+
+.thumbnail.current {
+	border: 2px solid var(--interactive-accent);
+}
+
+/* 页码信息相关样式 */
+.page-info {
+	color: var(--text-normal);
+	margin: 8px 0;
+	padding: 4px 8px;
+	background-color: var(--background-primary);
+	border-radius: 4px;
+	font-size: 14px;
+	font-weight: 500;
+	text-align: center;
+	display: block;
+	position: absolute;
+	top: -30px;
+	left: 50%;
+	transform: translateX(-50%);
+	white-space: nowrap;
+	z-index: 1000;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 缩略图栏样式 */
+.thumbnail-bar {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	background: var(--background-primary-alt);
+	padding: 10px;
+	opacity: 0;
+	transition: opacity 0.3s ease, transform 0.3s ease;
+	transform: translateY(100%);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+.thumbnail-bar.show {
+	opacity: 1;
+	transform: translateY(0);
+}
