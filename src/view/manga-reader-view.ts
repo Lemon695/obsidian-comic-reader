@@ -1,6 +1,6 @@
 import {ItemView, Menu, Notice, WorkspaceLeaf} from "obsidian";
 import JSZip from "jszip";
-import {MANGA_VIEW_TYPE} from "./constants";
+import {MANGA_VIEW_TYPE} from "../constants";
 
 interface MangaViewState {
 	file: File;
