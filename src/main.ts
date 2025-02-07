@@ -77,16 +77,14 @@ export default class MangaReaderPlugin extends Plugin {
 		await this.saveData(this.settings);
 	}
 
+
+
 	// 添加历史记录
 	async addToHistory(file: File, fileHandle: FileSystemFileHandle) {
 		const newItem: HistoryItem = {
 			path: file.name,
 			fileName: file.name,
-			lastOpened: Date.now(),
-			fileSystemHandle: {
-				kind: fileHandle.kind,
-				name: fileHandle.name
-			}
+			lastOpened: Date.now()
 		};
 
 		// 移除可能存在的重复项
@@ -106,9 +104,8 @@ export default class MangaReaderPlugin extends Plugin {
 		await this.saveSettings();
 	}
 
-	async requestFileAccess() {
+	async requestFileAccess(fileName?: string) {
 		try {
-			// 请求文件系统访问权限
 			const handle = await window.showOpenFilePicker({
 				types: [{
 					description: 'ZIP files',
@@ -117,7 +114,16 @@ export default class MangaReaderPlugin extends Plugin {
 					}
 				}]
 			});
-			return handle[0];
+
+			if (handle && handle[0]) {
+				const file = await handle[0].getFile();
+				if (fileName && file.name !== fileName) {
+					new Notice(`请选择文件: ${fileName}`);
+					return null;
+				}
+				return handle[0];
+			}
+			return null;
 		} catch (error) {
 			console.error('Error requesting file access:', error);
 			return null;
@@ -193,16 +199,13 @@ export class MangaHistoryModal extends Modal {
 
 			itemDiv.addEventListener('click', async () => {
 				try {
-					// 请求用户重新选择文件
-					const fileHandle = await this.plugin.requestFileAccess();
+					// 直接尝试打开文件
+					const fileHandle = await this.plugin.requestFileAccess(historyItem.fileName);
 					if (fileHandle) {
 						const file = await fileHandle.getFile();
-						// 检查文件名是否匹配
 						if (file.name === historyItem.fileName) {
 							await this.plugin.openMangaView(file, fileHandle);
 							this.close();
-						} else {
-							new Notice('Selected file does not match the history record.');
 						}
 					}
 				} catch (error) {
