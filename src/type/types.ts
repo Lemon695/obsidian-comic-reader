@@ -16,6 +16,7 @@ export interface HistoryItem {
 	path: string;           // 文件路径
 	fileName: string;       // 文件名
 	lastOpened: number;     // 最后打开时间戳
+	fileHandle: FileSystemFileHandle; // 直接存储文件句柄
 }
 
 // 插件设置接口

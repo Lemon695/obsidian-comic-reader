@@ -78,13 +78,13 @@ export default class MangaReaderPlugin extends Plugin {
 	}
 
 
-
 	// 添加历史记录
 	async addToHistory(file: File, fileHandle: FileSystemFileHandle) {
 		const newItem: HistoryItem = {
 			path: file.name,
 			fileName: file.name,
-			lastOpened: Date.now()
+			lastOpened: Date.now(),
+			fileHandle: fileHandle
 		};
 
 		// 移除可能存在的重复项
@@ -199,18 +199,25 @@ export class MangaHistoryModal extends Modal {
 
 			itemDiv.addEventListener('click', async () => {
 				try {
-					// 直接尝试打开文件
-					const fileHandle = await this.plugin.requestFileAccess(historyItem.fileName);
-					if (fileHandle) {
-						const file = await fileHandle.getFile();
-						if (file.name === historyItem.fileName) {
+					const file = await historyItem.fileHandle.getFile();
+					await this.plugin.openMangaView(file, historyItem.fileHandle);
+					this.close();
+				} catch (error) {
+					console.error('Error opening file from history:', error);
+					new Notice('无法打开文件，请重新选择文件');
+
+					// 如果直接打开失败，让用户重新选择文件
+					try {
+						const fileHandle = await this.plugin.requestFileAccess();
+						if (fileHandle) {
+							const file = await fileHandle.getFile();
 							await this.plugin.openMangaView(file, fileHandle);
 							this.close();
 						}
+					} catch (retryError) {
+						console.error('Error retrying file open:', retryError);
+						new Notice('打开文件失败');
 					}
-				} catch (error) {
-					console.error('Error opening file from history:', error);
-					new Notice('Error opening file. Please try selecting the file manually.');
 				}
 			});
 		}
