@@ -222,6 +222,11 @@ export class MangaReaderView extends ItemView {
 
 					thumbContainer.addEventListener('click', () => {
 						this.showImage(index);
+						// 点击缩略图时滚动到顶部
+						this.container.scrollTo({
+							top: 0,
+							behavior: 'smooth'
+						});
 					});
 				}
 			}
@@ -329,10 +334,14 @@ export class MangaReaderView extends ItemView {
 				this.currentImageUrl = URL.createObjectURL(blob);
 				this.imageEl.src = this.currentImageUrl;
 				this.currentIndex = index;
-				console.log("Image loaded successfully");
 
-				// 延迟更新缩略图，避免同时加载太多图片
-				setTimeout(() => this.updateThumbnails(), 100);
+				// 添加图片加载完成后的处理
+				this.imageEl.onload = () => {
+					// 将容器滚动到顶部
+					this.container.scrollTop = 0;
+					console.log("Image loaded successfully and scrolled to top");
+				};
+
 			} else {
 				console.log("Image file not found in zip");
 				this.imageEl.src = '';
@@ -394,12 +403,22 @@ export class MangaReaderView extends ItemView {
 	previousPage() {
 		if (this.currentIndex > 0) {
 			this.showImage(this.currentIndex - 1);
+			// 确保即使在图片加载之前也开始滚动
+			this.container.scrollTo({
+				top: 0,
+				behavior: 'smooth'
+			});
 		}
 	}
 
 	nextPage() {
 		if (this.currentIndex < this.images.length - 1) {
 			this.showImage(this.currentIndex + 1);
+			// 确保即使在图片加载之前也开始滚动
+			this.container.scrollTo({
+				top: 0,
+				behavior: 'smooth'
+			});
 		}
 	}
 

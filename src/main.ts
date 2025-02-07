@@ -27,20 +27,11 @@ export default class MangaReaderPlugin extends Plugin {
 			name: 'Open Manga ZIP',
 			callback: async () => {
 				try {
-					console.log("Command: open-manga-zip triggered");
-					const fileHandle = await window.showOpenFilePicker({
-						types: [{
-							description: 'ZIP files',
-							accept: {
-								'application/zip': ['.zip']
-							}
-						}]
-					});
-
-					if (fileHandle && fileHandle[0]) {
-						const file = await fileHandle[0].getFile();
+					const fileHandle = await this.requestFileAccess();
+					if (fileHandle) {
+						const file = await fileHandle.getFile();
 						console.log("File selected:", file.name);
-						await this.openMangaView(file, fileHandle[0]);
+						await this.openMangaView(file, fileHandle);
 					}
 				} catch (error) {
 					console.error('Error selecting file:', error);
@@ -58,22 +49,14 @@ export default class MangaReaderPlugin extends Plugin {
 		});
 
 		// 添加功能按钮到ribbon
+		// 添加功能按钮到ribbon
 		this.addRibbonIcon('book-open', 'Open Manga ZIP', async () => {
 			try {
-				console.log("Ribbon icon clicked");
-				const fileHandle = await window.showOpenFilePicker({
-					types: [{
-						description: 'ZIP files',
-						accept: {
-							'application/zip': ['.zip']
-						}
-					}]
-				});
-
-				if (fileHandle && fileHandle[0]) {
-					const file = await fileHandle[0].getFile();
+				const fileHandle = await this.requestFileAccess();
+				if (fileHandle) {
+					const file = await fileHandle.getFile();
 					console.log("File selected:", file.name);
-					await this.openMangaView(file, fileHandle[0]);
+					await this.openMangaView(file, fileHandle);
 				}
 			} catch (error) {
 				console.error('Error selecting file:', error);
@@ -84,9 +67,6 @@ export default class MangaReaderPlugin extends Plugin {
 		this.addRibbonIcon('history', 'Show Manga History', () => {
 			new MangaHistoryModal(this).open();
 		});
-
-		// 添加样式
-		this.addStyle();
 	}
 
 	async loadSettings() {
@@ -100,10 +80,13 @@ export default class MangaReaderPlugin extends Plugin {
 	// 添加历史记录
 	async addToHistory(file: File, fileHandle: FileSystemFileHandle) {
 		const newItem: HistoryItem = {
-			path: file.name, // 这里只能保存文件名，因为 File 对象不提供完整路径
+			path: file.name,
 			fileName: file.name,
 			lastOpened: Date.now(),
-			fileHandle: fileHandle
+			fileSystemHandle: {
+				kind: fileHandle.kind,
+				name: fileHandle.name
+			}
 		};
 
 		// 移除可能存在的重复项
@@ -121,6 +104,24 @@ export default class MangaReaderPlugin extends Plugin {
 
 		// 保存设置
 		await this.saveSettings();
+	}
+
+	async requestFileAccess() {
+		try {
+			// 请求文件系统访问权限
+			const handle = await window.showOpenFilePicker({
+				types: [{
+					description: 'ZIP files',
+					accept: {
+						'application/zip': ['.zip']
+					}
+				}]
+			});
+			return handle[0];
+		} catch (error) {
+			console.error('Error requesting file access:', error);
+			return null;
+		}
 	}
 
 	async openMangaView(file: File, fileHandle: FileSystemFileHandle) {
@@ -152,10 +153,6 @@ export default class MangaReaderPlugin extends Plugin {
 	onunload() {
 		console.log('Unloading MangaReader plugin');
 		this.app.workspace.detachLeavesOfType(MANGA_VIEW_TYPE);
-	}
-
-	private addStyle() {
-		// ...原有的样式代码...
 	}
 }
 
@@ -196,16 +193,21 @@ export class MangaHistoryModal extends Modal {
 
 			itemDiv.addEventListener('click', async () => {
 				try {
-					if (historyItem.fileHandle) {
-						const file = await historyItem.fileHandle.getFile();
-						await this.plugin.openMangaView(file, historyItem.fileHandle);
-						this.close();
-					} else {
-						new Notice('Could not access the file. Please open it manually.');
+					// 请求用户重新选择文件
+					const fileHandle = await this.plugin.requestFileAccess();
+					if (fileHandle) {
+						const file = await fileHandle.getFile();
+						// 检查文件名是否匹配
+						if (file.name === historyItem.fileName) {
+							await this.plugin.openMangaView(file, fileHandle);
+							this.close();
+						} else {
+							new Notice('Selected file does not match the history record.');
+						}
 					}
 				} catch (error) {
 					console.error('Error opening file from history:', error);
-					new Notice('Error opening file. The file might have been moved or deleted.');
+					new Notice('Error opening file. Please try selecting the file manually.');
 				}
 			});
 		}
