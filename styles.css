@@ -1,26 +1,76 @@
 /* 主容器样式 */
 .manga-reader-container {
 	position: relative;
-	display: flex;
-	flex-direction: column;
-	justify-content: flex-start; /* 改为从顶部开始对齐 */
-	align-items: center;
 	height: 100%;
 	width: 100%;
-	overflow-y: auto; /* 允许垂直滚动 */
-	padding-top: 20px; /* 添加顶部内边距 */
-	outline: none;
-	box-sizing: border-box; /* 确保内边距计入总高度 */
+	overflow-y: auto;
+	padding-bottom: 120px; /* 为缩略图栏预留空间 */
 }
 
 .manga-reader-image {
 	max-width: 100%;
-	height: 100%; /* 让高度自动适应宽度 */
+	height: 100%;
 	display: block;
 	margin: 0 auto;
 	object-fit: contain;
-	position: relative; /* 使用相对定位 */
-	z-index: 1; /* 确保图片在正确的层级 */
+	position: relative;
+	z-index: 1;
+}
+
+/* 韩漫/条漫模式 */
+.manga-reader-container.webtoon-mode {
+	padding: 0 20px;
+}
+
+.manga-reader-container.webtoon-mode .manga-reader-image {
+	max-width: 800px;
+	width: 100%;
+	height: auto !important;
+	margin: 0 auto 20px;
+	object-fit: contain;
+}
+
+/* 模式切换按钮 */
+.mode-switch-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 4px 8px;
+	margin-right: 8px;
+	background-color: var(--interactive-normal);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	color: var(--text-normal);
+	font-size: 12px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.mode-switch-button:hover {
+	background-color: var(--interactive-hover);
+}
+
+/* 缩略图栏样式 - 修改为固定定位 */
+.thumbnail-bar {
+	position: fixed;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	background: var(--background-primary-alt);
+	padding: 10px;
+	opacity: 0;
+	transform: translateY(100%);
+	transition: all 0.3s ease;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	z-index: 1000;
+	box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.thumbnail-bar.show {
+	opacity: 1;
+	transform: translateY(0);
 }
 
 /* 缩略图容器样式 */
@@ -32,7 +82,6 @@
 	width: 100%;
 	overflow-x: auto;
 	padding: 0 10px;
-	margin-top: auto; /* 将缩略图推到底部 */
 }
 
 /* 隐藏滚动条但保持功能 */
@@ -65,49 +114,17 @@
 	border: 2px solid var(--interactive-accent);
 }
 
-/* 页码信息相关样式 */
+/* 页码信息样式 */
 .page-info {
-	color: var(--text-normal);
-	margin: 8px 0;
-	padding: 4px 8px;
+	margin-bottom: 8px;
 	background-color: var(--background-primary);
+	padding: 4px 8px;
 	border-radius: 4px;
 	font-size: 14px;
-	font-weight: 500;
-	text-align: center;
-	display: block;
-	position: absolute;
-	top: -30px;
-	left: 50%;
-	transform: translateX(-50%);
-	white-space: nowrap;
-	z-index: 1000;
-	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	color: var(--text-normal);
 }
 
-/* 缩略图栏样式 */
-.thumbnail-bar {
-	position: absolute;
-	bottom: 0;
-	left: 0;
-	right: 0;
-	background: var(--background-primary-alt);
-	padding: 10px;
-	opacity: 0;
-	transition: opacity 0.3s ease, transform 0.3s ease;
-	transform: translateY(100%);
-	display: flex;
-	flex-direction: column;
-	align-items: center;
-	z-index: 1000;
-}
-
-.thumbnail-bar.show {
-	opacity: 1;
-	transform: translateY(0);
-}
-
-/* 历史记录动态窗口 */
+/* 历史记录样式保持不变 */
 .manga-history-list {
 	padding: 10px;
 	max-height: 400px;

@@ -17,6 +17,8 @@ export class MangaReaderView extends ItemView {
 	private pageInfo: HTMLDivElement;
 	private zipInstance: JSZip | null = null;  // 缓存 ZIP 实例
 	private currentImageUrl: string | null = null;  // 跟踪当前图片 URL
+	private isWebtoonMode: boolean = false;
+	private modeSwitchButton: HTMLButtonElement;
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -42,17 +44,35 @@ export class MangaReaderView extends ItemView {
 
 	async onOpen(): Promise<void> {
 		console.log("onOpen called");
+
 		const contentEl = this.containerEl.children[1];
 		if (!(contentEl instanceof HTMLElement)) {
 			throw new Error("Invalid container element");
 		}
+
+		// 创建顶部工具栏
+		const toolbarEl = this.containerEl.children[0];
+		if (!(toolbarEl instanceof HTMLElement)) {
+			throw new Error("Invalid toolbar element");
+		}
+
+		// 创建模式切换按钮并添加到工具栏
+		this.modeSwitchButton = toolbarEl.createEl('button', {
+			cls: 'mode-switch-button',
+			text: 'Webtoon Mode'
+		});
+
+		// 注册切换按钮点击事件
+		this.modeSwitchButton.addEventListener('click', () => {
+			this.toggleWebtoonMode();
+		});
 
 		// 清空容器
 		while (contentEl.firstChild) {
 			contentEl.removeChild(contentEl.firstChild);
 		}
 
-		this.container = (this.containerEl.children[1] as HTMLDivElement);
+		this.container = contentEl as HTMLDivElement;
 		this.container.addClass('manga-reader-container');
 		this.container.setAttribute('tabindex', '0');
 
@@ -77,14 +97,24 @@ export class MangaReaderView extends ItemView {
 
 		// 添加鼠标移动检测
 		this.registerDomEvent(this.container, 'mousemove', (e: MouseEvent) => {
-			const containerHeight = this.container.clientHeight;
-			const threshold = containerHeight - 150; // 距离底部150px时显示
+			const rect = this.container.getBoundingClientRect();
+			const threshold = 100; // 距离底部100px时显示
 
-			if (e.clientY > threshold) {
+			if (e.clientY > (rect.bottom - threshold)) {
 				this.thumbnailBar.addClass('show');
 			} else {
 				this.thumbnailBar.removeClass('show');
 			}
+		});
+
+		// 添加鼠标离开容器的处理
+		this.registerDomEvent(this.container, 'mouseleave', () => {
+			this.thumbnailBar.removeClass('show');
+		});
+
+		// 确保缩略图栏在鼠标悬停时保持显示
+		this.registerDomEvent(this.thumbnailBar, 'mouseenter', () => {
+			this.thumbnailBar.addClass('show');
 		});
 
 		// 监听容器的键盘事件
@@ -121,6 +151,21 @@ export class MangaReaderView extends ItemView {
 		if (this.currentFile) {
 			await this.loadManga(this.currentFile);
 		}
+	}
+
+	private toggleWebtoonMode(): void {
+		this.isWebtoonMode = !this.isWebtoonMode;
+
+		if (this.isWebtoonMode) {
+			this.container.addClass('webtoon-mode');
+			this.modeSwitchButton.setText('Normal Mode');
+		} else {
+			this.container.removeClass('webtoon-mode');
+			this.modeSwitchButton.setText('Webtoon Mode');
+		}
+
+		// 重新加载当前图片以应用新的样式
+		this.showImage(this.currentIndex);
 	}
 
 	private async updateThumbnails() {
