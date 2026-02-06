@@ -28,6 +28,7 @@ export class MangaReaderView extends ItemView {
 
     // UI 组件
     private container: HTMLDivElement | null = null;
+    private toolbarContainer: HTMLDivElement | null = null;
     private toolbar: Toolbar | null = null;
     private thumbnailBar: ThumbnailBar | null = null;
     private contextMenu: ContextMenu | null = null;
@@ -77,8 +78,14 @@ export class MangaReaderView extends ItemView {
         // 清空容器
         contentEl.empty();
 
-        // 创建主容器
-        this.container = contentEl.createDiv({ cls: 'manga-reader-container' });
+        // 创建整体布局容器
+        const layoutContainer = contentEl.createDiv({ cls: 'manga-reader-layout' });
+
+        // 创建工具栏容器（固定在顶部）
+        this.toolbarContainer = layoutContainer.createDiv({ cls: 'manga-toolbar-container' });
+
+        // 创建主容器（可滚动区域）
+        this.container = layoutContainer.createDiv({ cls: 'manga-reader-container' });
         this.container.setAttribute('tabindex', '0');
 
         // 初始化工具栏
@@ -106,10 +113,9 @@ export class MangaReaderView extends ItemView {
      * 初始化工具栏
      */
     private initToolbar(): void {
-        const toolbarEl = this.containerEl.children[0] as HTMLElement;
-        if (!toolbarEl) return;
+        if (!this.toolbarContainer) return;
 
-        this.toolbar = new Toolbar(toolbarEl, {
+        this.toolbar = new Toolbar(this.toolbarContainer, {
             showPageInfo: true,
             showModeSwitch: true,
             showZoomControls: true
