@@ -275,6 +275,9 @@ export class MangaReaderView extends ItemView {
             this.currentMode?.setTotalPages(comicData.info.pageCount);
             this.thumbnailBar?.setTotalPages(comicData.info.pageCount);
 
+            // 为韩漫模式设置图片加载器
+            this.setupWebtoonMode();
+
             // 显示第一页
             if (comicData.info.pageCount > 0) {
                 await this.showImage(0);
@@ -288,6 +291,19 @@ export class MangaReaderView extends ItemView {
         } catch (error) {
             console.error('[MangaReaderView] Error loading manga:', error);
             new Notice(`加载漫画失败: ${(error as Error).message}`);
+        }
+    }
+
+    /**
+     * 设置韩漫模式的图片加载器
+     */
+    private setupWebtoonMode(): void {
+        const webtoonMode = this.modes.get('webtoon') as WebtoonMode;
+        if (webtoonMode) {
+            // 设置图片加载器
+            webtoonMode.setImageLoader(async (index: number) => {
+                return await this.imageService.loadImage(index);
+            });
         }
     }
 
@@ -308,8 +324,9 @@ export class MangaReaderView extends ItemView {
             // 获取 Blob 用于复制
             this.currentBlob = await this.imageService.getImageBlob(index);
 
-            // 双页模式需要加载两张图片
+            // 根据不同模式处理
             if (this.currentMode?.name === 'double') {
+                // 双页模式需要加载两张图片
                 const doubleMode = this.currentMode as DoublePageMode;
                 let rightUrl: string | null = null;
 
@@ -319,8 +336,19 @@ export class MangaReaderView extends ItemView {
                 }
 
                 doubleMode.renderDoublePage(url, rightUrl, index);
+            } else if (this.currentMode?.name === 'webtoon') {
+                // 韩漫模式：初始化所有图片并跳转到指定页
+                const webtoonMode = this.currentMode as WebtoonMode;
+
+                // 确保已初始化图片
+                if (this.parser.getPageCount() > 0) {
+                    webtoonMode.initializeImages(this.parser.getPageCount());
+                }
+
+                // 渲染并跳转到指定页
+                webtoonMode.render(url, index);
             } else {
-                // 单页或韩漫模式
+                // 单页模式
                 this.currentMode?.render(url, index);
             }
 
@@ -328,8 +356,10 @@ export class MangaReaderView extends ItemView {
             this.toolbar?.setPageInfo(index, this.parser.getPageCount());
             await this.thumbnailBar?.setCurrentIndex(index);
 
-            // 预加载周围页面
-            this.imageService.preloadAround(index, 3);
+            // 预加载周围页面（非韩漫模式）
+            if (this.currentMode?.name !== 'webtoon') {
+                this.imageService.preloadAround(index, 3);
+            }
 
             // 发送事件
             this.eventBus.emit('comic:page-changed', {
@@ -386,10 +416,15 @@ export class MangaReaderView extends ItemView {
         this.currentMode.initialize(this.container);
         this.currentMode.setTotalPages(this.parser?.getPageCount() ?? 0);
 
+        // 如果是韩漫模式，确保设置了图片加载器
+        if (mode === 'webtoon') {
+            this.setupWebtoonMode();
+        }
+
         // 更新工具栏
         this.toolbar?.setMode(mode);
 
-        // 重新显示当前页面（使用 showImage 以支持双页模式）
+        // 重新显示当前页面
         if (this.currentImageUrl && this.parser) {
             this.showImage(this.currentIndex);
         }

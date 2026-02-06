@@ -56,11 +56,44 @@
 /* ===== 韩漫/条漫模式 ===== */
 .manga-reader-container.webtoon-mode {
 	padding: 0;
+	overflow-y: auto;
 }
 
 .manga-reader-container.webtoon-mode .webtoon-image-container {
 	flex-direction: column;
-	padding: 0 20px;
+	align-items: center;
+	padding: 0;
+	gap: 0;
+}
+
+/* 韩漫图片包装器 */
+.webtoon-image-wrapper {
+	position: relative;
+	width: 100%;
+	max-width: 800px;
+	margin: 0 auto;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+}
+
+/* 韩漫页码标签 */
+.webtoon-page-label {
+	position: absolute;
+	top: 10px;
+	right: 10px;
+	background-color: rgba(0, 0, 0, 0.6);
+	color: white;
+	padding: 4px 8px;
+	border-radius: 4px;
+	font-size: 12px;
+	z-index: 10;
+	opacity: 0;
+	transition: opacity 0.3s ease;
+}
+
+.webtoon-image-wrapper:hover .webtoon-page-label {
+	opacity: 1;
 }
 
 .manga-reader-container.webtoon-mode .webtoon-image {
@@ -69,6 +102,7 @@
 	height: auto !important;
 	max-height: none !important;
 	margin: 0 auto;
+	display: block;
 }
 
 /* 模式切换按钮 */
