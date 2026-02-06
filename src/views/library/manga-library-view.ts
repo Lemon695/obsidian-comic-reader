@@ -1,25 +1,35 @@
-import { ItemView, TFile, TFolder, Vault, WorkspaceLeaf, setIcon } from "obsidian";
-import { MANGA_LIBRARY_VIEW_TYPE } from "../constants";
-import { MangaFileInfo } from "../type/types";
-import type MangaReaderPlugin from "../main";
+/**
+ * 漫画库视图
+ */
+
+import { ItemView, TFile, WorkspaceLeaf, setIcon } from 'obsidian';
+import { MANGA_LIBRARY_VIEW_TYPE } from '../../constants';
+import { FileService } from '../../services';
+import type { MangaFileInfo, Settings } from '../../types';
+import type MangaReaderPlugin from '../../main';
 
 type SortField = 'name' | 'size' | 'mtime' | 'lastRead';
 type SortOrder = 'asc' | 'desc';
 
+/**
+ * 漫画库视图
+ */
 export class MangaLibraryView extends ItemView {
     private plugin: MangaReaderPlugin;
+    private fileService: FileService;
     private mangaFiles: MangaFileInfo[] = [];
     private filteredFiles: MangaFileInfo[] = [];
-    private searchInput: HTMLInputElement;
-    private tableBody: HTMLElement;
-    private tableHead: HTMLElement;
-    private container: HTMLDivElement;
+    private searchInput: HTMLInputElement | null = null;
+    private tableBody: HTMLElement | null = null;
+    private tableHead: HTMLElement | null = null;
+    private container: HTMLDivElement | null = null;
     private sortField: SortField = 'name';
     private sortOrder: SortOrder = 'asc';
 
     constructor(leaf: WorkspaceLeaf, plugin: MangaReaderPlugin) {
         super(leaf);
         this.plugin = plugin;
+        this.fileService = new FileService(plugin.app);
     }
 
     getViewType(): string {
@@ -35,28 +45,27 @@ export class MangaLibraryView extends ItemView {
     }
 
     async onOpen(): Promise<void> {
-        const contentEl = this.containerEl.children[1];
-        if (!(contentEl instanceof HTMLElement)) {
-            throw new Error("Invalid container element");
+        const contentEl = this.containerEl.children[1] as HTMLElement;
+        if (!contentEl) {
+            throw new Error('Invalid container element');
         }
 
         contentEl.empty();
         this.container = contentEl.createDiv({ cls: 'manga-library-container' });
 
-        // 创建搜索栏
         this.createSearchBar();
-
-        // 创建表格
         this.createTable();
-
-        // 加载漫画文件
         await this.loadMangaFiles();
     }
 
+    /**
+     * 创建搜索栏
+     */
     private createSearchBar(): void {
+        if (!this.container) return;
+
         const searchBar = this.container.createDiv({ cls: 'manga-library-search-bar' });
 
-        // 搜索输入框
         this.searchInput = searchBar.createEl('input', {
             type: 'text',
             placeholder: '搜索漫画...',
@@ -67,7 +76,6 @@ export class MangaLibraryView extends ItemView {
             this.filterFiles();
         });
 
-        // 刷新按钮
         const refreshButton = searchBar.createEl('button', {
             cls: 'manga-library-refresh-button'
         });
@@ -79,11 +87,15 @@ export class MangaLibraryView extends ItemView {
         });
     }
 
+    /**
+     * 创建表格
+     */
     private createTable(): void {
+        if (!this.container) return;
+
         const tableContainer = this.container.createDiv({ cls: 'manga-library-table-container' });
         const table = tableContainer.createEl('table', { cls: 'manga-library-table' });
 
-        // 表头
         const thead = table.createEl('thead');
         this.tableHead = thead.createEl('tr');
 
@@ -92,19 +104,20 @@ export class MangaLibraryView extends ItemView {
         this.createSortableHeader('最近添加', 'mtime');
         this.createSortableHeader('最近阅读', 'lastRead');
 
-        // 表体
         this.tableBody = table.createEl('tbody');
     }
 
+    /**
+     * 创建可排序的表头
+     */
     private createSortableHeader(label: string, field: SortField): void {
+        if (!this.tableHead) return;
+
         const th = this.tableHead.createEl('th', { cls: 'sortable-header' });
         const headerContent = th.createDiv({ cls: 'header-content' });
 
         headerContent.createSpan({ text: label });
-
         const sortIcon = headerContent.createSpan({ cls: 'sort-icon' });
-
-        // 设置初始排序图标
         this.updateSortIcon(sortIcon, field);
 
         th.addEventListener('click', () => {
@@ -112,15 +125,14 @@ export class MangaLibraryView extends ItemView {
         });
     }
 
+    /**
+     * 更新排序图标
+     */
     private updateSortIcon(iconEl: HTMLElement, field: SortField): void {
         iconEl.empty();
 
         if (this.sortField === field) {
-            if (this.sortOrder === 'asc') {
-                setIcon(iconEl, 'arrow-up');
-            } else {
-                setIcon(iconEl, 'arrow-down');
-            }
+            setIcon(iconEl, this.sortOrder === 'asc' ? 'arrow-up' : 'arrow-down');
             iconEl.addClass('active');
         } else {
             setIcon(iconEl, 'chevrons-up-down');
@@ -128,7 +140,12 @@ export class MangaLibraryView extends ItemView {
         }
     }
 
+    /**
+     * 更新所有排序图标
+     */
     private updateAllSortIcons(): void {
+        if (!this.tableHead) return;
+
         const headers = this.tableHead.querySelectorAll('.sortable-header');
         const fields: SortField[] = ['name', 'size', 'mtime', 'lastRead'];
 
@@ -140,12 +157,13 @@ export class MangaLibraryView extends ItemView {
         });
     }
 
+    /**
+     * 处理排序
+     */
     private handleSort(field: SortField): void {
         if (this.sortField === field) {
-            // 切换排序顺序
             this.sortOrder = this.sortOrder === 'asc' ? 'desc' : 'asc';
         } else {
-            // 新字段,默认升序
             this.sortField = field;
             this.sortOrder = 'asc';
         }
@@ -155,6 +173,9 @@ export class MangaLibraryView extends ItemView {
         this.renderTable();
     }
 
+    /**
+     * 排序文件
+     */
     private sortFiles(): void {
         this.filteredFiles.sort((a, b) => {
             let comparison = 0;
@@ -180,43 +201,40 @@ export class MangaLibraryView extends ItemView {
         });
     }
 
+    /**
+     * 获取最后阅读时间
+     */
     private getLastReadTime(path: string): number {
-        // 从历史记录中查找最后阅读时间
-        const historyItem = this.plugin.settings.history.find(
+        const history = this.plugin.getHistory();
+        const historyItem = history.find(
             item => item.path === path || item.fileName === path.split('/').pop()
         );
-        return historyItem ? historyItem.lastOpened : 0;
+        return historyItem?.lastOpened ?? 0;
     }
 
+    /**
+     * 加载漫画文件
+     */
     private async loadMangaFiles(): Promise<void> {
-        this.mangaFiles = await this.scanMangaFiles(this.plugin.settings.mangaLibraryFolder);
+        const settings = this.plugin.getSettings();
+        const folders = settings.libraryFolders ?? ['/'];
+
+        this.mangaFiles = [];
+        for (const folder of folders) {
+            const files = await this.fileService.scanMangaFiles(folder, settings.scanSubfolders);
+            this.mangaFiles.push(...files);
+        }
+
         this.filteredFiles = [...this.mangaFiles];
         this.sortFiles();
         this.renderTable();
     }
 
-    private async scanMangaFiles(folderPath: string): Promise<MangaFileInfo[]> {
-        const files: MangaFileInfo[] = [];
-        const folder = this.app.vault.getAbstractFileByPath(folderPath);
-
-        if (folder instanceof TFolder) {
-            Vault.recurseChildren(folder, (file) => {
-                if (file instanceof TFile && file.extension === 'zip') {
-                    files.push({
-                        name: file.name,
-                        path: file.path,
-                        size: file.stat.size,
-                        mtime: file.stat.mtime
-                    });
-                }
-            });
-        }
-
-        return files;
-    }
-
+    /**
+     * 过滤文件
+     */
     private filterFiles(): void {
-        const query = this.searchInput.value.toLowerCase();
+        const query = this.searchInput?.value.toLowerCase() ?? '';
         this.filteredFiles = this.mangaFiles.filter(f =>
             f.name.toLowerCase().includes(query)
         );
@@ -224,7 +242,12 @@ export class MangaLibraryView extends ItemView {
         this.renderTable();
     }
 
+    /**
+     * 渲染表格
+     */
     private renderTable(): void {
+        if (!this.tableBody) return;
+
         this.tableBody.empty();
 
         if (this.filteredFiles.length === 0) {
@@ -242,35 +265,34 @@ export class MangaLibraryView extends ItemView {
         for (const file of this.filteredFiles) {
             const row = this.tableBody.createEl('tr', { cls: 'manga-library-row' });
 
-            // 文件名
             row.createEl('td', { text: file.name });
-
-            // 文件大小
             row.createEl('td', { text: this.formatFileSize(file.size) });
-
-            // 最近添加时间
             row.createEl('td', { text: this.formatDate(file.mtime) });
 
-            // 最近阅读时间
             const lastReadTime = this.getLastReadTime(file.path);
             row.createEl('td', {
                 text: lastReadTime ? this.formatDate(lastReadTime) : '未阅读',
                 cls: lastReadTime ? '' : 'text-muted'
             });
 
-            // 点击事件
             row.addEventListener('click', async () => {
                 await this.openManga(file);
             });
         }
     }
 
+    /**
+     * 格式化文件大小
+     */
     private formatFileSize(bytes: number): string {
         if (bytes < 1024) return bytes + ' B';
         if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
         return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     }
 
+    /**
+     * 格式化日期
+     */
     private formatDate(timestamp: number): string {
         const date = new Date(timestamp);
         return date.toLocaleDateString('zh-CN', {
@@ -282,25 +304,19 @@ export class MangaLibraryView extends ItemView {
         });
     }
 
+    /**
+     * 打开漫画
+     */
     private async openManga(fileInfo: MangaFileInfo): Promise<void> {
         try {
-            const tfile = this.app.vault.getAbstractFileByPath(fileInfo.path);
-            if (!(tfile instanceof TFile)) {
+            const file = await this.fileService.readVaultFile(fileInfo.path);
+            if (!file) {
                 throw new Error('文件不存在');
             }
 
-            // 读取文件为 ArrayBuffer
-            const arrayBuffer = await this.app.vault.readBinary(tfile);
-
-            // 创建 File 对象
-            const file = new File([arrayBuffer], fileInfo.name, {
-                type: 'application/zip'
-            });
-
-            // 调用插件的打开方法
             await this.plugin.openMangaViewFromFile(file);
         } catch (error) {
-            console.error('Error opening manga:', error);
+            console.error('[MangaLibraryView] Error opening manga:', error);
         }
     }
 

@@ -1,295 +1,368 @@
+/**
+ * Obsidian Comic Reader 插件
+ *
+ * 一个功能强大的漫画阅读插件
+ */
+
 import { Plugin, Notice, Modal } from 'obsidian';
-import { MANGA_VIEW_TYPE, MANGA_LIBRARY_VIEW_TYPE } from "./constants";
-import { MangaReaderView } from "./view/manga-reader-view";
-import { MangaLibraryView } from "./view/manga-library-view";
-import { DEFAULT_SETTINGS, HistoryItem, MangaReaderSettings } from "./type/types";
+import { MANGA_VIEW_TYPE, MANGA_LIBRARY_VIEW_TYPE } from './constants';
+import { EventBus, getEventBus, resetEventBus } from './core';
+import {
+    StorageService,
+    HistoryService,
+    FileService,
+    ComicParserFactory
+} from './services';
+import { MangaReaderView, MangaLibraryView, SettingsTab } from './views';
+import type { Settings, HistoryItem } from './types';
+import { DEFAULT_SETTINGS } from './types';
 
 export default class MangaReaderPlugin extends Plugin {
-	settings: MangaReaderSettings;
+    private eventBus!: EventBus;
+    private storageService!: StorageService;
+    private historyService!: HistoryService;
+    private fileService!: FileService;
+    private settings: Settings = DEFAULT_SETTINGS;
 
-	async onload() {
-		// 加载设置
-		await this.loadSettings();
+    async onload(): Promise<void> {
+        console.log('Loading Comic Reader plugin');
 
-		console.log('Loading MangaReader plugin');
+        // 初始化核心服务
+        this.eventBus = getEventBus();
+        this.storageService = new StorageService(this);
+        this.historyService = new HistoryService(this.storageService, this.eventBus);
+        this.fileService = new FileService(this.app);
 
-		// 注册视图类型
-		this.registerView(
-			MANGA_VIEW_TYPE,
-			(leaf) => {
-				console.log("Creating new MangaReaderView");
-				return new MangaReaderView(leaf);
-			}
-		);
+        // 加载设置
+        await this.loadSettings();
 
-		// 注册漫画库视图类型
-		this.registerView(
-			MANGA_LIBRARY_VIEW_TYPE,
-			(leaf) => new MangaLibraryView(leaf, this)
-		);
+        // 初始化历史记录服务
+        await this.historyService.initialize(this.settings);
 
-		// 添加打开漫画的命令
-		this.addCommand({
-			id: 'open-manga-zip',
-			name: 'Open Manga ZIP',
-			callback: async () => {
-				try {
-					const fileHandle = await this.requestFileAccess();
-					if (fileHandle) {
-						const file = await fileHandle.getFile();
-						console.log("File selected:", file.name);
-						await this.openMangaView(file, fileHandle);
-					}
-				} catch (error) {
-					console.error('Error selecting file:', error);
-				}
-			}
-		});
+        // 注册视图
+        this.registerViews();
 
-		// 添加查看历史记录的命令
-		this.addCommand({
-			id: 'show-manga-history',
-			name: 'Show Manga History',
-			callback: () => {
-				new MangaHistoryModal(this).open();
-			}
-		});
+        // 注册命令
+        this.registerCommands();
 
-		// 添加打开漫画库的命令
-		this.addCommand({
-			id: 'open-manga-library',
-			name: 'Open Manga Library',
-			callback: async () => {
-				await this.openMangaLibrary();
-			}
-		});
+        // 注册 Ribbon 按钮
+        this.registerRibbonIcons();
 
-		// 添加功能按钮到ribbon
-		// 添加功能按钮到ribbon
-		this.addRibbonIcon('book-open', 'Open Manga ZIP', async () => {
-			try {
-				const fileHandle = await this.requestFileAccess();
-				if (fileHandle) {
-					const file = await fileHandle.getFile();
-					console.log("File selected:", file.name);
-					await this.openMangaView(file, fileHandle);
-				}
-			} catch (error) {
-				console.error('Error selecting file:', error);
-			}
-		});
+        // 注册设置标签页
+        this.addSettingTab(new SettingsTab(this.app, this));
 
-		// 添加历史记录按钮到ribbon
-		this.addRibbonIcon('history', 'Show Manga History', () => {
-			new MangaHistoryModal(this).open();
-		});
+        // 监听设置变化
+        this.eventBus.on('settings:changed', ({ settings }) => {
+            this.historyService.updateSettings(settings);
+        });
+    }
 
-		// 添加漫画库按钮到ribbon
-		this.addRibbonIcon('library', 'Open Manga Library', async () => {
-			await this.openMangaLibrary();
-		});
-	}
+    /**
+     * 注册视图
+     */
+    private registerViews(): void {
+        // 注册漫画阅读器视图
+        this.registerView(
+            MANGA_VIEW_TYPE,
+            (leaf) => new MangaReaderView(leaf)
+        );
 
-	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-	}
+        // 注册漫画库视图
+        this.registerView(
+            MANGA_LIBRARY_VIEW_TYPE,
+            (leaf) => new MangaLibraryView(leaf, this)
+        );
+    }
 
-	async saveSettings() {
-		await this.saveData(this.settings);
-	}
+    /**
+     * 注册命令
+     */
+    private registerCommands(): void {
+        // 打开漫画文件
+        this.addCommand({
+            id: 'open-manga-zip',
+            name: '打开漫画文件',
+            callback: async () => {
+                await this.openMangaFromPicker();
+            }
+        });
 
+        // 显示历史记录
+        this.addCommand({
+            id: 'show-manga-history',
+            name: '显示阅读历史',
+            callback: () => {
+                new MangaHistoryModal(this).open();
+            }
+        });
 
-	// 添加历史记录
-	async addToHistory(file: File, fileHandle: FileSystemFileHandle) {
-		const newItem: HistoryItem = {
-			path: file.name,
-			fileName: file.name,
-			lastOpened: Date.now(),
-			fileHandle: fileHandle
-		};
+        // 打开漫画库
+        this.addCommand({
+            id: 'open-manga-library',
+            name: '打开漫画库',
+            callback: async () => {
+                await this.openMangaLibrary();
+            }
+        });
+    }
 
-		// 移除可能存在的重复项
-		this.settings.history = this.settings.history.filter(
-			(item: HistoryItem) => item.fileName !== newItem.fileName
-		);
+    /**
+     * 注册 Ribbon 图标
+     */
+    private registerRibbonIcons(): void {
+        // 打开漫画按钮
+        this.addRibbonIcon('book-open', '打开漫画', async () => {
+            await this.openMangaFromPicker();
+        });
 
-		// 添加新项到开头
-		this.settings.history.unshift(newItem);
+        // 历史记录按钮
+        this.addRibbonIcon('history', '阅读历史', () => {
+            new MangaHistoryModal(this).open();
+        });
 
-		// 限制历史记录数量
-		if (this.settings.history.length > this.settings.maxHistoryItems) {
-			this.settings.history = this.settings.history.slice(0, this.settings.maxHistoryItems);
-		}
+        // 漫画库按钮
+        this.addRibbonIcon('library', '漫画库', async () => {
+            await this.openMangaLibrary();
+        });
+    }
 
-		// 保存设置
-		await this.saveSettings();
-	}
+    /**
+     * 加载设置
+     */
+    async loadSettings(): Promise<void> {
+        this.settings = await this.storageService.loadSettings();
+    }
 
-	async requestFileAccess(fileName?: string) {
-		try {
-			const handle = await window.showOpenFilePicker({
-				types: [{
-					description: 'ZIP files',
-					accept: {
-						'application/zip': ['.zip']
-					}
-				}]
-			});
+    /**
+     * 保存设置
+     */
+    async saveSettings(): Promise<void> {
+        await this.storageService.saveSettings(this.settings);
+    }
 
-			if (handle && handle[0]) {
-				const file = await handle[0].getFile();
-				if (fileName && file.name !== fileName) {
-					new Notice(`请选择文件: ${fileName}`);
-					return null;
-				}
-				return handle[0];
-			}
-			return null;
-		} catch (error) {
-			console.error('Error requesting file access:', error);
-			return null;
-		}
-	}
+    /**
+     * 更新设置
+     */
+    async updateSettings(partial: Partial<Settings>): Promise<void> {
+        this.settings = { ...this.settings, ...partial };
+        await this.saveSettings();
+        this.eventBus.emit('settings:changed', { settings: partial });
+    }
 
-	async openMangaView(file: File, fileHandle: FileSystemFileHandle) {
-		console.log("Opening manga view for file:", file.name);
-		const workspace = this.app.workspace;
+    /**
+     * 获取设置
+     */
+    getSettings(): Readonly<Settings> {
+        return this.settings;
+    }
 
-		// 添加到历史记录
-		await this.addToHistory(file, fileHandle);
+    /**
+     * 获取历史记录
+     */
+    getHistory(): readonly HistoryItem[] {
+        return this.historyService.getHistory();
+    }
 
-		// 创建新的叶子窗口
-		let leaf = workspace.getLeaf('split', 'vertical');
+    /**
+     * 清除历史记录
+     */
+    async clearHistory(): Promise<void> {
+        await this.historyService.clear();
+        new Notice('历史记录已清除');
+    }
 
-		// 先设置类型
-		await leaf.setViewState({
-			type: MANGA_VIEW_TYPE,
-		});
+    /**
+     * 从文件选择器打开漫画
+     */
+    async openMangaFromPicker(): Promise<void> {
+        try {
+            const fileHandle = await this.fileService.requestExternalFileAccess();
+            if (!fileHandle) return;
 
-		// 获取视图实例
-		const view = leaf.view as MangaReaderView;
-		if (view) {
-			// 设置文件
-			await view.setState({ file: file });
-		}
+            const file = await this.fileService.getFileFromHandle(fileHandle);
+            if (!file) {
+                new Notice('无法读取文件');
+                return;
+            }
 
-		// 激活视图
-		workspace.revealLeaf(leaf);
-	}
+            // 添加到历史记录
+            await this.historyService.addItem(
+                file.name,
+                file.name,
+                'external',
+                fileHandle
+            );
 
-	// 新增:从 File 对象打开漫画(供漫画库视图调用)
-	async openMangaViewFromFile(file: File): Promise<void> {
-		console.log("Opening manga view from file:", file.name);
-		const workspace = this.app.workspace;
+            // 打开阅读器
+            await this.openMangaView(file);
+        } catch (error) {
+            console.error('[MangaReaderPlugin] Error opening file:', error);
+            new Notice('打开文件失败');
+        }
+    }
 
-		// 创建新的叶子窗口
-		let leaf = workspace.getLeaf('split', 'vertical');
+    /**
+     * 打开漫画阅读器视图
+     */
+    async openMangaView(file: File): Promise<void> {
+        const workspace = this.app.workspace;
+        const leaf = workspace.getLeaf('split', 'vertical');
 
-		// 先设置类型
-		await leaf.setViewState({
-			type: MANGA_VIEW_TYPE,
-		});
+        await leaf.setViewState({
+            type: MANGA_VIEW_TYPE
+        });
 
-		// 获取视图实例
-		const view = leaf.view as MangaReaderView;
-		if (view) {
-			// 设置文件
-			await view.setState({ file: file });
-		}
+        const view = leaf.view as MangaReaderView;
+        if (view) {
+            await view.setState({ file });
+        }
 
-		// 激活视图
-		workspace.revealLeaf(leaf);
-	}
+        workspace.revealLeaf(leaf);
+    }
 
-	// 新增:打开漫画库视图
-	async openMangaLibrary(): Promise<void> {
-		const workspace = this.app.workspace;
-		const leaves = workspace.getLeavesOfType(MANGA_LIBRARY_VIEW_TYPE);
+    /**
+     * 从 File 对象打开漫画（供漫画库调用）
+     */
+    async openMangaViewFromFile(file: File): Promise<void> {
+        // 添加到历史记录
+        await this.historyService.addItem(
+            file.name,
+            file.name,
+            'vault'
+        );
 
-		if (leaves.length > 0) {
-			// 如果已经打开,激活现有视图
-			workspace.revealLeaf(leaves[0]);
-		} else {
-			// 创建新的视图
-			const leaf = workspace.getLeaf('tab');
-			await leaf.setViewState({
-				type: MANGA_LIBRARY_VIEW_TYPE,
-				active: true
-			});
-			workspace.revealLeaf(leaf);
-		}
-	}
+        await this.openMangaView(file);
+    }
 
-	onunload() {
-		console.log('Unloading MangaReader plugin');
-		this.app.workspace.detachLeavesOfType(MANGA_VIEW_TYPE);
-		this.app.workspace.detachLeavesOfType(MANGA_LIBRARY_VIEW_TYPE);
-	}
+    /**
+     * 打开漫画库视图
+     */
+    async openMangaLibrary(): Promise<void> {
+        const workspace = this.app.workspace;
+        const leaves = workspace.getLeavesOfType(MANGA_LIBRARY_VIEW_TYPE);
+
+        if (leaves.length > 0) {
+            workspace.revealLeaf(leaves[0]);
+        } else {
+            const leaf = workspace.getLeaf('tab');
+            await leaf.setViewState({
+                type: MANGA_LIBRARY_VIEW_TYPE,
+                active: true
+            });
+            workspace.revealLeaf(leaf);
+        }
+    }
+
+    onunload(): void {
+        console.log('Unloading Comic Reader plugin');
+
+        // 清理视图
+        this.app.workspace.detachLeavesOfType(MANGA_VIEW_TYPE);
+        this.app.workspace.detachLeavesOfType(MANGA_LIBRARY_VIEW_TYPE);
+
+        // 清理解析器工厂
+        ComicParserFactory.reset();
+
+        // 清理事件总线
+        resetEventBus();
+    }
 }
 
-// 历史记录模态窗口类
-export class MangaHistoryModal extends Modal {
-	plugin: MangaReaderPlugin;
+/**
+ * 历史记录模态窗口
+ */
+class MangaHistoryModal extends Modal {
+    private plugin: MangaReaderPlugin;
 
-	constructor(plugin: MangaReaderPlugin) {
-		super(plugin.app);
-		this.plugin = plugin;
-	}
+    constructor(plugin: MangaReaderPlugin) {
+        super(plugin.app);
+        this.plugin = plugin;
+    }
 
-	async onOpen() {
-		const { contentEl } = this;
-		contentEl.empty();
+    async onOpen(): Promise<void> {
+        const { contentEl } = this;
+        contentEl.empty();
+        contentEl.addClass('manga-history-modal');
 
-		contentEl.createEl('h2', { text: 'Manga Reading History' });
+        contentEl.createEl('h2', { text: '阅读历史' });
 
-		const historyList = contentEl.createEl('div', { cls: 'manga-history-list' });
+        const history = this.plugin.getHistory();
 
-		if (this.plugin.settings.history.length === 0) {
-			historyList.createEl('p', { text: 'No reading history yet.' });
-			return;
-		}
+        if (history.length === 0) {
+            contentEl.createEl('p', {
+                text: '暂无阅读历史',
+                cls: 'manga-history-empty'
+            });
+            return;
+        }
 
-		for (const historyItem of this.plugin.settings.history) {
-			const itemDiv = historyList.createEl('div', { cls: 'manga-history-item' });
+        const historyList = contentEl.createDiv({ cls: 'manga-history-list' });
 
-			const titleEl = itemDiv.createEl('div', {
-				text: historyItem.fileName,
-				cls: 'manga-history-title'
-			});
+        for (const item of history) {
+            const itemDiv = historyList.createDiv({ cls: 'manga-history-item' });
 
-			const dateEl = itemDiv.createEl('div', {
-				text: new Date(historyItem.lastOpened).toLocaleString(),
-				cls: 'manga-history-date'
-			});
+            itemDiv.createDiv({
+                text: item.fileName,
+                cls: 'manga-history-title'
+            });
 
-			itemDiv.addEventListener('click', async () => {
-				try {
-					const file = await historyItem.fileHandle.getFile();
-					await this.plugin.openMangaView(file, historyItem.fileHandle);
-					this.close();
-				} catch (error) {
-					console.error('Error opening file from history:', error);
-					new Notice('无法打开文件，请重新选择文件');
+            const infoDiv = itemDiv.createDiv({ cls: 'manga-history-info' });
+            infoDiv.createSpan({
+                text: new Date(item.lastOpened).toLocaleString(),
+                cls: 'manga-history-date'
+            });
 
-					// 如果直接打开失败，让用户重新选择文件
-					try {
-						const fileHandle = await this.plugin.requestFileAccess();
-						if (fileHandle) {
-							const file = await fileHandle.getFile();
-							await this.plugin.openMangaView(file, fileHandle);
-							this.close();
-						}
-					} catch (retryError) {
-						console.error('Error retrying file open:', retryError);
-						new Notice('打开文件失败');
-					}
-				}
-			});
-		}
-	}
+            if (item.lastPage !== undefined && item.totalPages !== undefined) {
+                infoDiv.createSpan({
+                    text: ` · ${item.lastPage + 1}/${item.totalPages}`,
+                    cls: 'manga-history-progress'
+                });
+            }
 
-	onClose() {
-		const { contentEl } = this;
-		contentEl.empty();
-	}
+            itemDiv.addEventListener('click', async () => {
+                await this.openHistoryItem(item);
+            });
+        }
+    }
+
+    /**
+     * 打开历史记录项
+     */
+    private async openHistoryItem(item: HistoryItem): Promise<void> {
+        try {
+            let file: File | null = null;
+
+            if (item.sourceType === 'external' && item.fileHandle) {
+                // 外部文件，使用文件句柄
+                file = await item.fileHandle.getFile();
+            } else {
+                // Vault 内文件
+                const fileService = new FileService(this.app);
+                file = await fileService.readVaultFile(item.path);
+            }
+
+            if (!file) {
+                // 文件不可访问，提示用户重新选择
+                new Notice('无法访问文件，请重新选择');
+                const fileService = new FileService(this.app);
+                const handle = await fileService.requestExternalFileAccess();
+                if (handle) {
+                    file = await fileService.getFileFromHandle(handle);
+                }
+            }
+
+            if (file) {
+                await this.plugin.openMangaView(file);
+                this.close();
+            }
+        } catch (error) {
+            console.error('[MangaHistoryModal] Error opening file:', error);
+            new Notice('打开文件失败');
+        }
+    }
+
+    onClose(): void {
+        const { contentEl } = this;
+        contentEl.empty();
+    }
 }
