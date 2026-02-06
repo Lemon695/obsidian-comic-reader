@@ -25,12 +25,15 @@
 
 /* ===== 单页模式 ===== */
 .manga-reader-container.single-page-mode .single-image-container {
-	padding: 10px;
+	padding: 0 20px;
+	flex-direction: column;
 }
 
 .manga-reader-container.single-page-mode .single-page-image {
-	max-width: 100%;
-	max-height: calc(100vh - 150px);
+	max-width: 800px;
+	width: 100%;
+	height: auto !important;
+	max-height: none !important;
 	margin: 0 auto;
 }
 

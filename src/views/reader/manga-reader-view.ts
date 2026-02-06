@@ -308,8 +308,21 @@ export class MangaReaderView extends ItemView {
             // 获取 Blob 用于复制
             this.currentBlob = await this.imageService.getImageBlob(index);
 
-            // 渲染图片
-            this.currentMode?.render(url, index);
+            // 双页模式需要加载两张图片
+            if (this.currentMode?.name === 'double') {
+                const doubleMode = this.currentMode as DoublePageMode;
+                let rightUrl: string | null = null;
+
+                // 如果有下一页，加载它
+                if (index + 1 < this.parser.getPageCount()) {
+                    rightUrl = await this.imageService.loadImage(index + 1);
+                }
+
+                doubleMode.renderDoublePage(url, rightUrl, index);
+            } else {
+                // 单页或韩漫模式
+                this.currentMode?.render(url, index);
+            }
 
             // 更新 UI
             this.toolbar?.setPageInfo(index, this.parser.getPageCount());
@@ -376,9 +389,9 @@ export class MangaReaderView extends ItemView {
         // 更新工具栏
         this.toolbar?.setMode(mode);
 
-        // 重新显示当前页面
-        if (this.currentImageUrl) {
-            this.currentMode.render(this.currentImageUrl, this.currentIndex);
+        // 重新显示当前页面（使用 showImage 以支持双页模式）
+        if (this.currentImageUrl && this.parser) {
+            this.showImage(this.currentIndex);
         }
 
         // 发送事件
