@@ -148,7 +148,7 @@ export class Toolbar {
     }
 
     /**
-     * 设置缩放比例
+     * 设置缩放比例（由按钮点击触发，会通知外部）
      */
     setZoom(zoom: number): void {
         this.currentZoom = zoom;
@@ -157,6 +157,14 @@ export class Toolbar {
         if (this.onZoomChangeCallback) {
             this.onZoomChangeCallback(zoom);
         }
+    }
+
+    /**
+     * 仅更新缩放显示（由外部调用，不触发回调，避免循环）
+     */
+    updateZoomDisplay(zoom: number): void {
+        this.currentZoom = zoom;
+        this.updateZoomInfo();
     }
 
     /**

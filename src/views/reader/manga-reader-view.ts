@@ -486,7 +486,8 @@ export class MangaReaderView extends ItemView {
     setZoom(zoom: number): void {
         this.currentZoom = Math.max(30, Math.min(300, zoom));
         this.applyZoom();
-        this.toolbar?.setZoom(this.currentZoom);
+        // 使用 updateZoomDisplay 仅更新显示，不触发回调，避免循环调用
+        this.toolbar?.updateZoomDisplay(this.currentZoom);
     }
 
     /**
