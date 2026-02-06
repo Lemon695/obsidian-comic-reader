@@ -30,6 +30,9 @@ export class WebtoonMode extends BaseReadingMode {
     /** 图片加载回调 */
     private imageLoader: ((index: number) => Promise<string>) | null = null;
 
+    /** 页码变化回调 */
+    private onPageChangeCallback: ((index: number, total: number) => void) | null = null;
+
     /** 滚动容器 */
     private scrollContainer: HTMLElement | null = null;
 
@@ -41,6 +44,9 @@ export class WebtoonMode extends BaseReadingMode {
 
     /** 防抖定时器 */
     private scrollDebounceTimer: number | null = null;
+
+    /** 上一次的页码索引，用于避免重复触发回调 */
+    private lastReportedIndex: number = -1;
 
     protected setupContainer(): void {
         if (!this.container) return;
@@ -90,7 +96,16 @@ export class WebtoonMode extends BaseReadingMode {
 
         if (visibleIndices.length > 0) {
             // 更新当前索引为第一个可见图片
-            this.currentIndex = visibleIndices[0];
+            const newIndex = visibleIndices[0];
+            this.currentIndex = newIndex;
+
+            // 如果页码变化了，触发回调
+            if (newIndex !== this.lastReportedIndex) {
+                this.lastReportedIndex = newIndex;
+                if (this.onPageChangeCallback) {
+                    this.onPageChangeCallback(newIndex, this.totalPages);
+                }
+            }
 
             // 加载可见图片及其周围的图片
             this.loadVisibleImages(visibleIndices);
@@ -159,6 +174,13 @@ export class WebtoonMode extends BaseReadingMode {
      */
     setImageLoader(loader: (index: number) => Promise<string>): void {
         this.imageLoader = loader;
+    }
+
+    /**
+     * 设置页码变化回调
+     */
+    onPageChange(callback: (index: number, total: number) => void): void {
+        this.onPageChangeCallback = callback;
     }
 
     /**
@@ -300,8 +322,10 @@ export class WebtoonMode extends BaseReadingMode {
         // 清理图片状态
         this.imageStates = [];
         this.imageLoader = null;
+        this.onPageChangeCallback = null;
         this.scrollContainer = null;
         this.scrollHandler = null;
+        this.lastReportedIndex = -1;
 
         super.dispose();
     }

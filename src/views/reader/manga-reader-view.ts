@@ -41,6 +41,7 @@ export class MangaReaderView extends ItemView {
     private currentFile: File | null = null;
     private currentImageUrl: string | null = null;
     private currentBlob: Blob | null = null;
+    private currentZoom: number = 100;
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
@@ -110,11 +111,16 @@ export class MangaReaderView extends ItemView {
 
         this.toolbar = new Toolbar(toolbarEl, {
             showPageInfo: true,
-            showModeSwitch: true
+            showModeSwitch: true,
+            showZoomControls: true
         });
 
         this.toolbar.onModeChange((mode) => {
             this.switchMode(mode);
+        });
+
+        this.toolbar.onZoomChange((zoom) => {
+            this.setZoom(zoom);
         });
     }
 
@@ -176,6 +182,18 @@ export class MangaReaderView extends ItemView {
         this.registerDomEvent(this.container, 'keydown', (evt: KeyboardEvent) => {
             this.handleKeydown(evt);
         });
+
+        // 鼠标滚轮缩放 (Ctrl + 滚轮)
+        this.registerDomEvent(this.container, 'wheel', (evt: WheelEvent) => {
+            if (evt.ctrlKey || evt.metaKey) {
+                evt.preventDefault();
+                if (evt.deltaY < 0) {
+                    this.zoomIn();
+                } else {
+                    this.zoomOut();
+                }
+            }
+        }, { passive: false });
 
         // 鼠标移动显示缩略图栏
         this.registerDomEvent(this.container, 'mousemove', (e: MouseEvent) => {
@@ -249,6 +267,19 @@ export class MangaReaderView extends ItemView {
             case '3':
                 this.switchMode('webtoon');
                 break;
+            case '+':
+            case '=':
+                evt.preventDefault();
+                this.zoomIn();
+                break;
+            case '-':
+                evt.preventDefault();
+                this.zoomOut();
+                break;
+            case '0':
+                evt.preventDefault();
+                this.resetZoom();
+                break;
         }
     }
 
@@ -303,6 +334,13 @@ export class MangaReaderView extends ItemView {
             // 设置图片加载器
             webtoonMode.setImageLoader(async (index: number) => {
                 return await this.imageService.loadImage(index);
+            });
+
+            // 设置页码变化回调
+            webtoonMode.onPageChange((index: number, total: number) => {
+                this.currentIndex = index;
+                this.toolbar?.setPageInfo(index, total);
+                this.thumbnailBar?.setCurrentIndex(index);
             });
         }
     }
@@ -429,8 +467,94 @@ export class MangaReaderView extends ItemView {
             this.showImage(this.currentIndex);
         }
 
+        // 应用当前缩放
+        this.applyZoom();
+
         // 发送事件
         this.eventBus.emit('comic:mode-changed', { mode });
+    }
+
+    /**
+     * 设置缩放比例
+     */
+    setZoom(zoom: number): void {
+        this.currentZoom = Math.max(30, Math.min(300, zoom));
+        this.applyZoom();
+        this.toolbar?.setZoom(this.currentZoom);
+    }
+
+    /**
+     * 放大
+     */
+    zoomIn(): void {
+        this.setZoom(this.currentZoom + 10);
+    }
+
+    /**
+     * 缩小
+     */
+    zoomOut(): void {
+        this.setZoom(this.currentZoom - 10);
+    }
+
+    /**
+     * 重置缩放
+     */
+    resetZoom(): void {
+        this.setZoom(100);
+    }
+
+    /**
+     * 应用缩放到图片
+     */
+    private applyZoom(): void {
+        if (!this.container) return;
+
+        const scale = this.currentZoom / 100;
+
+        // 使用 width 属性来缩放，这样可以正确扩展滚动区域
+        // transform: scale() 不会改变元素的实际占用空间，导致无法滚动查看
+
+        if (this.currentMode?.name === 'double') {
+            // 双页模式：调整容器宽度
+            const doubleContainer = this.container.querySelector('.double-page-container') as HTMLElement;
+            if (doubleContainer) {
+                // 基础宽度是 100%，缩放后的宽度
+                const baseWidth = 100 * scale;
+                doubleContainer.style.width = `${baseWidth}%`;
+                doubleContainer.style.maxWidth = 'none';
+                doubleContainer.style.transform = '';
+            }
+        } else if (this.currentMode?.name === 'webtoon') {
+            // 韩漫模式：调整每个图片包装器的宽度
+            const wrappers = this.container.querySelectorAll('.webtoon-image-wrapper');
+            wrappers.forEach((wrapper) => {
+                const wrapperEl = wrapper as HTMLElement;
+                // 基础最大宽度是 800px
+                const baseWidth = 800 * scale;
+                wrapperEl.style.maxWidth = `${baseWidth}px`;
+            });
+            // 清除图片的 transform
+            const images = this.container.querySelectorAll('.manga-reader-image');
+            images.forEach((img) => {
+                const imgEl = img as HTMLImageElement;
+                imgEl.style.transform = '';
+            });
+        } else {
+            // 单页模式：调整图片宽度
+            const imageContainer = this.container.querySelector('.single-image-container') as HTMLElement;
+            const images = this.container.querySelectorAll('.single-page-image');
+            images.forEach((img) => {
+                const imgEl = img as HTMLImageElement;
+                // 基础最大宽度是 800px
+                const baseWidth = 800 * scale;
+                imgEl.style.maxWidth = `${baseWidth}px`;
+                imgEl.style.transform = '';
+            });
+        }
+
+        // 更新容器的 CSS 变量，供其他样式使用
+        this.container.style.setProperty('--zoom-scale', String(scale));
     }
 
     /**

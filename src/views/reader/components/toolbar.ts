@@ -15,11 +15,13 @@ export interface ToolbarButton {
 export interface ToolbarOptions {
     showPageInfo: boolean;
     showModeSwitch: boolean;
+    showZoomControls: boolean;
 }
 
 const DEFAULT_OPTIONS: ToolbarOptions = {
     showPageInfo: true,
-    showModeSwitch: true
+    showModeSwitch: true,
+    showZoomControls: true
 };
 
 /**
@@ -31,8 +33,11 @@ export class Toolbar {
     private buttons: Map<string, HTMLButtonElement> = new Map();
     private pageInfoEl: HTMLElement | null = null;
     private modeSwitchEl: HTMLButtonElement | null = null;
+    private zoomInfoEl: HTMLElement | null = null;
     private currentMode: ReadingMode = 'single';
+    private currentZoom: number = 100;
     private onModeChangeCallback: ((mode: ReadingMode) => void) | null = null;
+    private onZoomChangeCallback: ((zoom: number) => void) | null = null;
 
     constructor(container: HTMLElement, options: Partial<ToolbarOptions> = {}) {
         this.container = container;
@@ -50,6 +55,11 @@ export class Toolbar {
         const leftSection = this.container.createEl('div', {
             cls: 'toolbar-section toolbar-left'
         });
+
+        // 添加缩放控制到左侧
+        if (this.options.showZoomControls) {
+            this.setupZoomControls(leftSection);
+        }
 
         // 中间信息区域
         if (this.options.showPageInfo) {
@@ -78,6 +88,98 @@ export class Toolbar {
                 this.cycleMode();
             });
         }
+    }
+
+    /**
+     * 设置缩放控制
+     */
+    private setupZoomControls(container: HTMLElement): void {
+        // 缩小按钮
+        const zoomOutBtn = container.createEl('button', {
+            cls: 'toolbar-button zoom-button',
+            attr: { 'aria-label': '缩小 (-)' }
+        });
+        setIcon(zoomOutBtn, 'minus');
+        zoomOutBtn.addEventListener('click', () => {
+            this.zoomOut();
+        });
+        this.buttons.set('zoom-out', zoomOutBtn);
+
+        // 缩放比例显示
+        this.zoomInfoEl = container.createEl('span', {
+            cls: 'toolbar-zoom-info',
+            text: '100%'
+        });
+
+        // 点击缩放比例重置为100%
+        this.zoomInfoEl.addEventListener('click', () => {
+            this.setZoom(100);
+        });
+
+        // 放大按钮
+        const zoomInBtn = container.createEl('button', {
+            cls: 'toolbar-button zoom-button',
+            attr: { 'aria-label': '放大 (+)' }
+        });
+        setIcon(zoomInBtn, 'plus');
+        zoomInBtn.addEventListener('click', () => {
+            this.zoomIn();
+        });
+        this.buttons.set('zoom-in', zoomInBtn);
+
+        // 分隔符
+        container.createEl('div', { cls: 'toolbar-separator' });
+    }
+
+    /**
+     * 放大
+     */
+    zoomIn(): void {
+        const newZoom = Math.min(this.currentZoom + 10, 300);
+        this.setZoom(newZoom);
+    }
+
+    /**
+     * 缩小
+     */
+    zoomOut(): void {
+        const newZoom = Math.max(this.currentZoom - 10, 30);
+        this.setZoom(newZoom);
+    }
+
+    /**
+     * 设置缩放比例
+     */
+    setZoom(zoom: number): void {
+        this.currentZoom = zoom;
+        this.updateZoomInfo();
+
+        if (this.onZoomChangeCallback) {
+            this.onZoomChangeCallback(zoom);
+        }
+    }
+
+    /**
+     * 获取当前缩放比例
+     */
+    getZoom(): number {
+        return this.currentZoom;
+    }
+
+    /**
+     * 更新缩放信息显示
+     */
+    private updateZoomInfo(): void {
+        if (this.zoomInfoEl) {
+            this.zoomInfoEl.textContent = `${this.currentZoom}%`;
+        }
+    }
+
+    /**
+     * 设置缩放变化回调
+     */
+    onZoomChange(callback: (zoom: number) => void): void {
+        this.onZoomChangeCallback = callback;
     }
 
     /**
@@ -210,5 +312,6 @@ export class Toolbar {
     dispose(): void {
         this.buttons.clear();
         this.onModeChangeCallback = null;
+        this.onZoomChangeCallback = null;
     }
 }
