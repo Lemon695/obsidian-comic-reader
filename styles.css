@@ -4,7 +4,8 @@
 	height: 100%;
 	width: 100%;
 	overflow-y: auto;
-	padding-bottom: 120px; /* 为缩略图栏预留空间 */
+	padding-bottom: 120px;
+	/* 为缩略图栏预留空间 */
 }
 
 .manga-reader-image {
@@ -153,4 +154,152 @@
 .manga-history-date {
 	font-size: 0.85em;
 	color: var(--text-muted);
+}
+
+/* 漫画库视图样式 */
+.manga-library-container {
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+	padding: 20px;
+	overflow: hidden;
+}
+
+.manga-library-search-bar {
+	display: flex;
+	gap: 10px;
+	margin-bottom: 20px;
+	align-items: center;
+}
+
+.manga-library-search-input {
+	flex: 1;
+	padding: 8px 12px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	font-size: 14px;
+}
+
+.manga-library-search-input:focus {
+	outline: none;
+	border-color: var(--interactive-accent);
+}
+
+.manga-library-refresh-button {
+	padding: 8px 16px;
+	background-color: var(--interactive-normal);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	color: var(--text-normal);
+	cursor: pointer;
+	font-size: 14px;
+	transition: all 0.2s ease;
+}
+
+.manga-library-refresh-button {
+	padding: 8px 16px;
+	background-color: var(--interactive-normal);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	color: var(--text-normal);
+	cursor: pointer;
+	font-size: 14px;
+	transition: all 0.2s ease;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.manga-library-refresh-button:hover {
+	background-color: var(--interactive-hover);
+}
+
+.manga-library-table-container {
+	flex: 1;
+	overflow-y: auto;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+}
+
+.manga-library-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.manga-library-table thead {
+	position: sticky;
+	top: 0;
+	background-color: var(--background-primary-alt);
+	z-index: 10;
+}
+
+.manga-library-table th {
+	padding: 12px;
+	text-align: left;
+	font-weight: 600;
+	border-bottom: 2px solid var(--background-modifier-border);
+	color: var(--text-normal);
+}
+
+/* 可排序表头样式 */
+.sortable-header {
+	cursor: pointer;
+	user-select: none;
+	transition: background-color 0.2s ease;
+}
+
+.sortable-header:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.header-content {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.sort-icon {
+	display: flex;
+	align-items: center;
+	opacity: 0.3;
+	transition: opacity 0.2s ease;
+}
+
+.sort-icon.active {
+	opacity: 1;
+}
+
+.sortable-header:hover .sort-icon {
+	opacity: 0.6;
+}
+
+.sortable-header:hover .sort-icon.active {
+	opacity: 1;
+}
+
+.manga-library-table td {
+	padding: 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	color: var(--text-normal);
+}
+
+.manga-library-table td.text-muted {
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+.manga-library-row {
+	cursor: pointer;
+	transition: background-color 0.2s ease;
+}
+
+.manga-library-row:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.manga-library-row:active {
+	background-color: var(--background-modifier-active-hover);
 }

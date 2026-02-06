@@ -1,7 +1,8 @@
-import {Plugin, Notice, Modal} from 'obsidian';
-import {MANGA_VIEW_TYPE} from "./constants";
-import {MangaReaderView} from "./view/manga-reader-view";
-import {DEFAULT_SETTINGS, HistoryItem, MangaReaderSettings} from "./type/types";
+import { Plugin, Notice, Modal } from 'obsidian';
+import { MANGA_VIEW_TYPE, MANGA_LIBRARY_VIEW_TYPE } from "./constants";
+import { MangaReaderView } from "./view/manga-reader-view";
+import { MangaLibraryView } from "./view/manga-library-view";
+import { DEFAULT_SETTINGS, HistoryItem, MangaReaderSettings } from "./type/types";
 
 export default class MangaReaderPlugin extends Plugin {
 	settings: MangaReaderSettings;
@@ -19,6 +20,12 @@ export default class MangaReaderPlugin extends Plugin {
 				console.log("Creating new MangaReaderView");
 				return new MangaReaderView(leaf);
 			}
+		);
+
+		// 注册漫画库视图类型
+		this.registerView(
+			MANGA_LIBRARY_VIEW_TYPE,
+			(leaf) => new MangaLibraryView(leaf, this)
 		);
 
 		// 添加打开漫画的命令
@@ -48,6 +55,15 @@ export default class MangaReaderPlugin extends Plugin {
 			}
 		});
 
+		// 添加打开漫画库的命令
+		this.addCommand({
+			id: 'open-manga-library',
+			name: 'Open Manga Library',
+			callback: async () => {
+				await this.openMangaLibrary();
+			}
+		});
+
 		// 添加功能按钮到ribbon
 		// 添加功能按钮到ribbon
 		this.addRibbonIcon('book-open', 'Open Manga ZIP', async () => {
@@ -66,6 +82,11 @@ export default class MangaReaderPlugin extends Plugin {
 		// 添加历史记录按钮到ribbon
 		this.addRibbonIcon('history', 'Show Manga History', () => {
 			new MangaHistoryModal(this).open();
+		});
+
+		// 添加漫画库按钮到ribbon
+		this.addRibbonIcon('library', 'Open Manga Library', async () => {
+			await this.openMangaLibrary();
 		});
 	}
 
@@ -89,7 +110,7 @@ export default class MangaReaderPlugin extends Plugin {
 
 		// 移除可能存在的重复项
 		this.settings.history = this.settings.history.filter(
-			item => item.fileName !== newItem.fileName
+			(item: HistoryItem) => item.fileName !== newItem.fileName
 		);
 
 		// 添加新项到开头
@@ -149,16 +170,60 @@ export default class MangaReaderPlugin extends Plugin {
 		const view = leaf.view as MangaReaderView;
 		if (view) {
 			// 设置文件
-			await view.setState({file: file});
+			await view.setState({ file: file });
 		}
 
 		// 激活视图
 		workspace.revealLeaf(leaf);
 	}
 
+	// 新增:从 File 对象打开漫画(供漫画库视图调用)
+	async openMangaViewFromFile(file: File): Promise<void> {
+		console.log("Opening manga view from file:", file.name);
+		const workspace = this.app.workspace;
+
+		// 创建新的叶子窗口
+		let leaf = workspace.getLeaf('split', 'vertical');
+
+		// 先设置类型
+		await leaf.setViewState({
+			type: MANGA_VIEW_TYPE,
+		});
+
+		// 获取视图实例
+		const view = leaf.view as MangaReaderView;
+		if (view) {
+			// 设置文件
+			await view.setState({ file: file });
+		}
+
+		// 激活视图
+		workspace.revealLeaf(leaf);
+	}
+
+	// 新增:打开漫画库视图
+	async openMangaLibrary(): Promise<void> {
+		const workspace = this.app.workspace;
+		const leaves = workspace.getLeavesOfType(MANGA_LIBRARY_VIEW_TYPE);
+
+		if (leaves.length > 0) {
+			// 如果已经打开,激活现有视图
+			workspace.revealLeaf(leaves[0]);
+		} else {
+			// 创建新的视图
+			const leaf = workspace.getLeaf('tab');
+			await leaf.setViewState({
+				type: MANGA_LIBRARY_VIEW_TYPE,
+				active: true
+			});
+			workspace.revealLeaf(leaf);
+		}
+	}
+
 	onunload() {
 		console.log('Unloading MangaReader plugin');
 		this.app.workspace.detachLeavesOfType(MANGA_VIEW_TYPE);
+		this.app.workspace.detachLeavesOfType(MANGA_LIBRARY_VIEW_TYPE);
 	}
 }
 
@@ -172,20 +237,20 @@ export class MangaHistoryModal extends Modal {
 	}
 
 	async onOpen() {
-		const {contentEl} = this;
+		const { contentEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl('h2', {text: 'Manga Reading History'});
+		contentEl.createEl('h2', { text: 'Manga Reading History' });
 
-		const historyList = contentEl.createEl('div', {cls: 'manga-history-list'});
+		const historyList = contentEl.createEl('div', { cls: 'manga-history-list' });
 
 		if (this.plugin.settings.history.length === 0) {
-			historyList.createEl('p', {text: 'No reading history yet.'});
+			historyList.createEl('p', { text: 'No reading history yet.' });
 			return;
 		}
 
 		for (const historyItem of this.plugin.settings.history) {
-			const itemDiv = historyList.createEl('div', {cls: 'manga-history-item'});
+			const itemDiv = historyList.createEl('div', { cls: 'manga-history-item' });
 
 			const titleEl = itemDiv.createEl('div', {
 				text: historyItem.fileName,
@@ -224,7 +289,7 @@ export class MangaHistoryModal extends Modal {
 	}
 
 	onClose() {
-		const {contentEl} = this;
+		const { contentEl } = this;
 		contentEl.empty();
 	}
 }

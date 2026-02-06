@@ -22,3 +22,5 @@ data.json
 .DS_Store
 /pnpm-lock.yaml
 /npminstall-debug.log
+/dist/*
+/build-v1.sh
