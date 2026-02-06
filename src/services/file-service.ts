@@ -6,8 +6,8 @@ import { App, TFile, TFolder, Vault } from 'obsidian';
 import type { MangaFileInfo, ComicFormat } from '../types';
 import { getComicFormat } from '../types';
 
-/** 支持的漫画文件扩展名 */
-const SUPPORTED_EXTENSIONS = ['zip', 'cbz', 'cbr', 'pdf'];
+/** 支持的漫画文件扩展名（目前只支持 ZIP/CBZ） */
+const SUPPORTED_EXTENSIONS = ['zip', 'cbz'];
 
 /**
  * 文件服务类

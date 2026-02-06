@@ -20,8 +20,8 @@ export abstract class BaseReadingMode {
     /** 容器元素 */
     protected container: HTMLElement | null = null;
 
-    /** 图片元素 */
-    protected imageEl: HTMLImageElement | null = null;
+    /** 图片容器 */
+    protected imageContainer: HTMLElement | null = null;
 
     /** 当前页码 */
     protected currentIndex: number = 0;
@@ -29,12 +29,40 @@ export abstract class BaseReadingMode {
     /** 总页数 */
     protected totalPages: number = 0;
 
+    /** 是否已初始化 */
+    protected initialized: boolean = false;
+
     /**
      * 初始化模式
      */
     initialize(container: HTMLElement): void {
         this.container = container;
+
+        // 清理旧的图片容器
+        this.cleanup();
+
+        // 设置容器样式
         this.setupContainer();
+
+        this.initialized = true;
+    }
+
+    /**
+     * 清理旧的元素
+     */
+    protected cleanup(): void {
+        if (!this.container) return;
+
+        // 移除所有模式相关的类
+        this.container.removeClass('single-page-mode');
+        this.container.removeClass('double-page-mode');
+        this.container.removeClass('webtoon-mode');
+
+        // 移除旧的图片容器
+        const oldContainer = this.container.querySelector('.mode-image-container');
+        if (oldContainer) {
+            oldContainer.remove();
+        }
     }
 
     /**
@@ -104,7 +132,9 @@ export abstract class BaseReadingMode {
      * 清理资源
      */
     dispose(): void {
+        this.cleanup();
         this.container = null;
-        this.imageEl = null;
+        this.imageContainer = null;
+        this.initialized = false;
     }
 }

@@ -8,27 +8,64 @@
 	/* 为缩略图栏预留空间 */
 }
 
+/* ===== 阅读模式通用样式 ===== */
+.mode-image-container {
+	display: flex;
+	justify-content: center;
+	align-items: flex-start;
+	min-height: 100%;
+}
+
 .manga-reader-image {
-	max-width: 100%;
-	height: 100%;
 	display: block;
-	margin: 0 auto;
 	object-fit: contain;
 	position: relative;
 	z-index: 1;
 }
 
-/* 韩漫/条漫模式 */
+/* ===== 单页模式 ===== */
+.manga-reader-container.single-page-mode .single-image-container {
+	padding: 10px;
+}
+
+.manga-reader-container.single-page-mode .single-page-image {
+	max-width: 100%;
+	max-height: calc(100vh - 150px);
+	margin: 0 auto;
+}
+
+/* ===== 双页模式 ===== */
+.manga-reader-container.double-page-mode .double-page-container {
+	display: flex;
+	justify-content: center;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 10px;
+}
+
+.manga-reader-container.double-page-mode .double-page-left,
+.manga-reader-container.double-page-mode .double-page-right {
+	max-width: 48%;
+	max-height: calc(100vh - 150px);
+	object-fit: contain;
+}
+
+/* ===== 韩漫/条漫模式 ===== */
 .manga-reader-container.webtoon-mode {
+	padding: 0;
+}
+
+.manga-reader-container.webtoon-mode .webtoon-image-container {
+	flex-direction: column;
 	padding: 0 20px;
 }
 
-.manga-reader-container.webtoon-mode .manga-reader-image {
-	max-width: 1000px;
+.manga-reader-container.webtoon-mode .webtoon-image {
+	max-width: 800px;
 	width: 100%;
 	height: auto !important;
-	margin: 0 auto 20px;
-	object-fit: contain;
+	max-height: none !important;
+	margin: 0 auto;
 }
 
 /* 模式切换按钮 */
@@ -51,12 +88,63 @@
 	background-color: var(--interactive-hover);
 }
 
-/* 缩略图栏样式 - 修改为固定定位 */
-.thumbnail-bar {
+/* ===== 工具栏样式 ===== */
+.manga-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 4px 8px;
+	background-color: var(--background-primary-alt);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.toolbar-section {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.toolbar-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 4px 8px;
+	background-color: transparent;
+	border: none;
+	border-radius: 4px;
+	color: var(--text-normal);
+	font-size: 12px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.toolbar-button:hover {
+	background-color: var(--interactive-hover);
+}
+
+.toolbar-page-info {
+	font-size: 13px;
+	color: var(--text-muted);
+	padding: 0 8px;
+}
+
+.toolbar-separator {
+	width: 1px;
+	height: 20px;
+	background-color: var(--background-modifier-border);
+	margin: 0 4px;
+}
+
+/* ===== 缩略图栏样式 ===== */
+.thumbnail-bar-wrapper {
 	position: fixed;
 	bottom: 0;
 	left: 0;
 	right: 0;
+	z-index: 1000;
+}
+
+.thumbnail-bar {
 	background: var(--background-primary-alt);
 	padding: 10px;
 	opacity: 0;
@@ -65,7 +153,6 @@
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	z-index: 1000;
 	box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
 }
 
@@ -125,11 +212,21 @@
 	color: var(--text-normal);
 }
 
-/* 历史记录样式保持不变 */
+/* ===== 历史记录样式 ===== */
+.manga-history-modal {
+	max-width: 500px;
+}
+
 .manga-history-list {
 	padding: 10px;
 	max-height: 400px;
 	overflow-y: auto;
+}
+
+.manga-history-empty {
+	text-align: center;
+	color: var(--text-muted);
+	padding: 20px;
 }
 
 .manga-history-item {
@@ -151,12 +248,21 @@
 	margin-bottom: 5px;
 }
 
+.manga-history-info {
+	font-size: 0.85em;
+	color: var(--text-muted);
+}
+
 .manga-history-date {
 	font-size: 0.85em;
 	color: var(--text-muted);
 }
 
-/* 漫画库视图样式 */
+.manga-history-progress {
+	color: var(--interactive-accent);
+}
+
+/* ===== 漫画库视图样式 ===== */
 .manga-library-container {
 	height: 100%;
 	display: flex;
@@ -185,17 +291,6 @@
 .manga-library-search-input:focus {
 	outline: none;
 	border-color: var(--interactive-accent);
-}
-
-.manga-library-refresh-button {
-	padding: 8px 16px;
-	background-color: var(--interactive-normal);
-	border: 1px solid var(--background-modifier-border);
-	border-radius: 4px;
-	color: var(--text-normal);
-	cursor: pointer;
-	font-size: 14px;
-	transition: all 0.2s ease;
 }
 
 .manga-library-refresh-button {

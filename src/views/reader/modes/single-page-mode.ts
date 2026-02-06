@@ -6,26 +6,30 @@ import { BaseReadingMode } from './base-mode';
 import type { ReadingMode } from '../../../types';
 
 /**
- * 单页模式 - 每次显示一页
+ * 单页模式 - 每次显示一页，图片居中显示
  */
 export class SinglePageMode extends BaseReadingMode {
     readonly name: ReadingMode = 'single';
     readonly displayName = '单页模式';
     readonly icon = 'file';
 
+    private imageEl: HTMLImageElement | null = null;
+
     protected setupContainer(): void {
         if (!this.container) return;
 
-        this.container.removeClass('webtoon-mode');
-        this.container.removeClass('double-page-mode');
+        // 添加模式类
         this.container.addClass('single-page-mode');
 
+        // 创建图片容器
+        this.imageContainer = this.container.createEl('div', {
+            cls: 'mode-image-container single-image-container'
+        });
+
         // 创建图片元素
-        if (!this.imageEl) {
-            this.imageEl = this.container.createEl('img', {
-                cls: 'manga-reader-image'
-            });
-        }
+        this.imageEl = this.imageContainer.createEl('img', {
+            cls: 'manga-reader-image single-page-image'
+        });
     }
 
     render(imageUrl: string, index: number): void {
@@ -45,5 +49,10 @@ export class SinglePageMode extends BaseReadingMode {
      */
     getImageElement(): HTMLImageElement | null {
         return this.imageEl;
+    }
+
+    dispose(): void {
+        this.imageEl = null;
+        super.dispose();
     }
 }

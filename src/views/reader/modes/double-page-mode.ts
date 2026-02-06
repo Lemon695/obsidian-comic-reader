@@ -6,7 +6,7 @@ import { BaseReadingMode } from './base-mode';
 import type { ReadingMode } from '../../../types';
 
 /**
- * 双页模式 - 每次显示两页（适合传统漫画）
+ * 双页模式 - 每次显示两页（适合传统漫画和大屏幕）
  */
 export class DoublePageMode extends BaseReadingMode {
     readonly name: ReadingMode = 'double';
@@ -15,45 +15,39 @@ export class DoublePageMode extends BaseReadingMode {
 
     private leftImageEl: HTMLImageElement | null = null;
     private rightImageEl: HTMLImageElement | null = null;
-    private imageContainer: HTMLDivElement | null = null;
 
     protected setupContainer(): void {
         if (!this.container) return;
 
-        this.container.removeClass('single-page-mode');
-        this.container.removeClass('webtoon-mode');
+        // 添加模式类
         this.container.addClass('double-page-mode');
 
-        // 创建双页容器
-        if (!this.imageContainer) {
-            this.imageContainer = this.container.createEl('div', {
-                cls: 'double-page-container'
-            });
+        // 创建图片容器
+        this.imageContainer = this.container.createEl('div', {
+            cls: 'mode-image-container double-page-container'
+        });
 
-            this.leftImageEl = this.imageContainer.createEl('img', {
-                cls: 'manga-reader-image double-page-left'
-            });
+        // 创建左侧图片
+        this.leftImageEl = this.imageContainer.createEl('img', {
+            cls: 'manga-reader-image double-page-left'
+        });
 
-            this.rightImageEl = this.imageContainer.createEl('img', {
-                cls: 'manga-reader-image double-page-right'
-            });
-        }
+        // 创建右侧图片
+        this.rightImageEl = this.imageContainer.createEl('img', {
+            cls: 'manga-reader-image double-page-right'
+        });
     }
 
     render(imageUrl: string, index: number): void {
-        // 双页模式需要特殊处理
-        // 这里简化实现，只显示当前页
-        if (!this.leftImageEl) return;
+        // 双页模式：当前页显示在左边
+        if (!this.leftImageEl || !this.rightImageEl) return;
 
         this.currentIndex = index;
         this.leftImageEl.src = imageUrl;
 
-        // 如果有下一页，显示在右边
-        // 注意：这需要外部传入第二张图片的 URL
-        if (this.rightImageEl) {
-            this.rightImageEl.src = '';
-            this.rightImageEl.style.display = 'none';
-        }
+        // 右侧暂时隐藏（需要外部传入第二张图片）
+        this.rightImageEl.src = '';
+        this.rightImageEl.style.display = 'none';
 
         this.leftImageEl.onload = () => {
             this.scrollToTop();
@@ -121,9 +115,8 @@ export class DoublePageMode extends BaseReadingMode {
     }
 
     dispose(): void {
-        super.dispose();
         this.leftImageEl = null;
         this.rightImageEl = null;
-        this.imageContainer = null;
+        super.dispose();
     }
 }
