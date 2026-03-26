@@ -1,37 +1,55 @@
-import { Plugin } from 'obsidian';
+import { Plugin, Setting } from 'obsidian';
 import { MANGA_VIEW_TYPE } from '../constants';
-import { ComicSettings } from '../core/types';
+import { ComicSettings, ProgressEntry } from '../core/types';
 import { t } from '../i18n/locale';
 import { commandsI18n } from '../i18n/reader/commands';
 import { settingsI18n } from '../i18n/reader/settings';
+import { historyI18n } from '../i18n/reader/history';
 import { ImageManager } from './image-manager';
 import { MangaReaderView } from './view';
-import { Setting } from 'obsidian';
+import { HistoryModal } from './history-modal';
+import { getRecentHistory } from './parser';
 
 // Minimal interface to avoid circular dependency with main.ts
 interface ComicPlugin extends Plugin {
 	settings: ComicSettings;
 	saveSettings(): Promise<void>;
+	getProgress(fileName: string): ProgressEntry | undefined;
+	saveProgress(fileName: string, entry: ProgressEntry): Promise<void>;
+	deleteProgress(fileName: string): Promise<void>;
 }
 
 export class ReaderModule {
 	constructor(private plugin: ComicPlugin) {}
 
 	onload(): void {
-		const i18n = t(commandsI18n);
+		const cmdI18n = t(commandsI18n);
+		const histI18n = t(historyI18n);
 
 		this.plugin.registerView(
 			MANGA_VIEW_TYPE,
-			(leaf) => new MangaReaderView(leaf, new ImageManager(), this.plugin.settings.reader)
+			(leaf) => new MangaReaderView(
+				leaf,
+				new ImageManager(),
+				this.plugin.settings.reader,
+				(fileName) => this.plugin.getProgress(fileName),
+				(fileName, entry) => this.plugin.saveProgress(fileName, entry),
+			)
 		);
 
 		this.plugin.addCommand({
 			id: 'open-comic-zip',
-			name: i18n.openComic,
+			name: cmdI18n.openComic,
 			callback: () => this.openFileAndLoad(),
 		});
 
-		this.plugin.addRibbonIcon('book-open', i18n.ribbonTooltip, () => this.openFileAndLoad());
+		this.plugin.addRibbonIcon('book-open', cmdI18n.ribbonTooltip, () => this.openFileAndLoad());
+
+		this.plugin.addCommand({
+			id: 'view-reading-history',
+			name: histI18n.commandName,
+			callback: () => this.openHistoryModal(),
+		});
 	}
 
 	onunload(): void {
@@ -71,6 +89,15 @@ export class ReaderModule {
 			);
 	}
 
+	private openHistoryModal(): void {
+		const entries = getRecentHistory(this.plugin.settings.history);
+		new HistoryModal(
+			this.plugin.app,
+			entries,
+			(fileName) => this.plugin.deleteProgress(fileName),
+		).open();
+	}
+
 	private async openFileAndLoad(): Promise<void> {
 		try {
 			const i18n = t(commandsI18n);
@@ -91,6 +118,14 @@ export class ReaderModule {
 	}
 
 	private async openMangaView(file: File): Promise<void> {
+		// 记录打开时间（保留已有页码）
+		const existing = this.plugin.getProgress(file.name);
+		await this.plugin.saveProgress(file.name, {
+			page: existing?.page ?? 0,
+			total: existing?.total ?? 0,
+			openedAt: Date.now(),
+		});
+
 		const workspace = this.plugin.app.workspace;
 		const leaf = workspace.getLeaf('split', 'vertical');
 

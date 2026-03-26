@@ -1,7 +1,7 @@
 import { ItemView, Menu, Notice, WorkspaceLeaf } from 'obsidian';
 import JSZip from 'jszip';
 import { MANGA_VIEW_TYPE } from '../constants';
-import { ReaderSettings } from '../core/types';
+import { ProgressEntry, ReaderSettings } from '../core/types';
 import { t } from '../i18n/locale';
 import { noticesI18n } from '../i18n/reader/notices';
 import { contextMenuI18n } from '../i18n/reader/context-menu';
@@ -12,6 +12,9 @@ interface MangaViewState {
 	file: File;
 }
 
+type ProgressGetter = (fileName: string) => ProgressEntry | undefined;
+type ProgressSaver = (fileName: string, entry: ProgressEntry) => Promise<void>;
+
 export class MangaReaderView extends ItemView {
 	private currentIndex = 0;
 	private images: string[] = [];
@@ -21,11 +24,14 @@ export class MangaReaderView extends ItemView {
 	private thumbnailBar: HTMLDivElement;
 	private pageInfo: HTMLDivElement;
 	private zipInstance: JSZip | null = null;
+	private saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	constructor(
 		leaf: WorkspaceLeaf,
 		private imgManager: ImageManager,
 		private settings: ReaderSettings,
+		private getProgress: ProgressGetter,
+		private saveProgress: ProgressSaver,
 	) {
 		super(leaf);
 	}
@@ -104,6 +110,10 @@ export class MangaReaderView extends ItemView {
 	}
 
 	async onClose(): Promise<void> {
+		if (this.saveDebounceTimer) {
+			clearTimeout(this.saveDebounceTimer);
+			this.saveDebounceTimer = null;
+		}
 		this.imgManager.dispose();
 		this.zipInstance = null;
 	}
@@ -115,7 +125,9 @@ export class MangaReaderView extends ItemView {
 			this.images = extractImages(zipContent, this.settings.sortOrder);
 
 			if (this.images.length > 0) {
-				await this.showImage(0);
+				const saved = this.getProgress(file.name);
+				const startIndex = (saved && saved.page < this.images.length) ? saved.page : 0;
+				await this.showImage(startIndex);
 			} else {
 				const notices = t(noticesI18n);
 				(this.containerEl.children[1] as HTMLElement).setText(notices.noImagesFound);
@@ -134,6 +146,7 @@ export class MangaReaderView extends ItemView {
 			const { url } = await this.imgManager.loadImage(this.zipInstance, this.images[index]);
 			this.imageEl.src = url;
 			this.currentIndex = index;
+			this.scheduleSaveProgress();
 			setTimeout(() => this.updateThumbnails(), 100);
 		} catch (error) {
 			console.error('Error showing image:', error);
@@ -156,13 +169,25 @@ export class MangaReaderView extends ItemView {
 		}
 	}
 
+	private scheduleSaveProgress(): void {
+		if (this.saveDebounceTimer) clearTimeout(this.saveDebounceTimer);
+		this.saveDebounceTimer = setTimeout(() => {
+			if (this.currentFile) {
+				this.saveProgress(this.currentFile.name, {
+					page: this.currentIndex,
+					total: this.images.length,
+					openedAt: Date.now(),
+				});
+			}
+		}, 500);
+	}
+
 	private async updateThumbnails(): Promise<void> {
 		if (!this.zipInstance || !this.thumbnailBar) return;
 
 		const thumbnailContainer = this.thumbnailBar.querySelector('.thumbnail-container');
 		if (!thumbnailContainer) return;
 
-		// Revoke old thumbnail URLs before clearing
 		thumbnailContainer.querySelectorAll<HTMLImageElement>('img').forEach(img => {
 			if (img.src) this.imgManager.revokeThumbnailUrl(img.src);
 		});
