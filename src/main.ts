@@ -1,123 +1,48 @@
-// main.ts
-import {Plugin} from 'obsidian';
-import {MANGA_VIEW_TYPE} from "./constants";
-import {MangaReaderView} from "./manga-reader-view";
+import { Plugin } from 'obsidian';
+import { ComicSettings, DEFAULT_SETTINGS, ProgressEntry } from './core/types';
+import { ComicSettingsTab } from './core/settings-tab';
+import { ReaderModule } from './reader/index';
+import { pruneHistory } from './reader/parser';
 import './types';
 
-export default class MangaReaderPlugin extends Plugin {
-	async onload() {
-		console.log('Loading MangaReader plugin');
+export default class ComicReaderPlugin extends Plugin {
+	settings: ComicSettings;
+	private readerModule: ReaderModule;
 
-		// 注册视图类型
-		this.registerView(
-			MANGA_VIEW_TYPE,
-			(leaf) => {
-				console.log("Creating new MangaReaderView");
-				return new MangaReaderView(leaf);
-			}
-		);
-
-		// 添加打开漫画的命令
-		this.addCommand({
-			id: 'open-manga-zip',
-			name: 'Open Manga ZIP',
-			callback: async () => {
-				try {
-					console.log("Command: open-manga-zip triggered");
-					const fileHandle = await window.showOpenFilePicker({
-						types: [{
-							description: 'ZIP files',
-							accept: {
-								'application/zip': ['.zip']
-							}
-						}]
-					});
-
-					if (fileHandle && fileHandle[0]) {
-						const file = await fileHandle[0].getFile();
-						console.log("File selected:", file.name);
-						await this.openMangaView(file);
-					}
-				} catch (error) {
-					console.error('Error selecting file:', error);
-				}
-			}
-		});
-
-		// 添加功能按钮到ribbon
-		this.addRibbonIcon('book-open', 'Open Manga ZIP', async () => {
-			try {
-				console.log("Ribbon icon clicked");
-				const fileHandle = await window.showOpenFilePicker({
-					types: [{
-						description: 'ZIP files',
-						accept: {
-							'application/zip': ['.zip']
-						}
-					}]
-				});
-
-				if (fileHandle && fileHandle[0]) {
-					const file = await fileHandle[0].getFile();
-					console.log("File selected:", file.name);
-					await this.openMangaView(file);
-				}
-			} catch (error) {
-				console.error('Error selecting file:', error);
-			}
-		});
-
-		// 添加样式
-		this.addStyle();
+	async onload(): Promise<void> {
+		await this.loadSettings();
+		this.readerModule = new ReaderModule(this);
+		this.readerModule.onload();
+		this.addSettingTab(new ComicSettingsTab(this.app, this, this.readerModule));
 	}
 
-	async openMangaView(file: File) {
-		console.log("Opening manga view for file:", file.name);
-		const workspace = this.app.workspace;
-
-		// 创建新的叶子窗口
-		let leaf = workspace.getLeaf('split', 'vertical');
-
-		// 先设置类型
-		await leaf.setViewState({
-			type: MANGA_VIEW_TYPE,
-		});
-
-		// 获取视图实例
-		const view = leaf.view as MangaReaderView;
-		if (view) {
-			// 设置文件
-			await view.setState({file: file});
-		}
-
-		// 激活视图
-		workspace.revealLeaf(leaf);
+	onunload(): void {
+		this.readerModule.onunload();
 	}
 
-	onunload() {
-		console.log('Unloading MangaReader plugin');
-		this.app.workspace.detachLeavesOfType(MANGA_VIEW_TYPE);
+	async loadSettings(): Promise<void> {
+		const saved = await this.loadData();
+		this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
+		this.settings.reader = Object.assign({}, DEFAULT_SETTINGS.reader, saved?.reader);
+		this.settings.history = saved?.history ?? {};
 	}
 
-	private addStyle() {
-		// 添加样式
-		const styleEl = document.createElement('style');
-		styleEl.innerHTML = `
-            .manga-reader-container {
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                height: 100%;
-                background-color: var(--background-primary);
-            }
-            
-            .manga-reader-image {
-                max-width: 100%;
-                max-height: 100vh;
-                object-fit: contain;
-                display: block;
-            }
-        `;
-		document.head.appendChild(styleEl);
+	async saveSettings(): Promise<void> {
+		await this.saveData(this.settings);
+	}
+
+	getProgress(fileName: string): ProgressEntry | undefined {
+		return this.settings.history[fileName];
+	}
+
+	async saveProgress(fileName: string, entry: ProgressEntry): Promise<void> {
+		this.settings.history[fileName] = entry;
+		this.settings.history = pruneHistory(this.settings.history);
+		await this.saveData(this.settings);
+	}
+
+	async deleteProgress(fileName: string): Promise<void> {
+		delete this.settings.history[fileName];
+		await this.saveData(this.settings);
 	}
 }
