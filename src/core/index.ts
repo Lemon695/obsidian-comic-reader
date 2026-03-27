@@ -7,3 +7,5 @@ export type { EventMap } from './event-bus';
 
 export { StateManager, getStateManager, resetStateManager } from './state-manager';
 export type { AppState } from './state-manager';
+
+export { ModuleManager } from './module-manager';

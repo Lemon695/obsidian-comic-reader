@@ -25,8 +25,8 @@ export class ThumbnailBar {
     private pageInfo: HTMLElement;
     private options: ThumbnailBarOptions;
     private imageService: ImageService | null = null;
-    private totalPages: number = 0;
-    private currentIndex: number = 0;
+    private totalPages = 0;
+    private currentIndex = 0;
     private onSelectCallback: ((index: number) => void) | null = null;
     private thumbnailUrls: Map<number, string> = new Map();
 

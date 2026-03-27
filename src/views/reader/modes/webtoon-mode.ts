@@ -37,7 +37,7 @@ export class WebtoonMode extends BaseReadingMode {
     private scrollContainer: HTMLElement | null = null;
 
     /** 预加载范围（当前可见图片前后各加载多少张） */
-    private preloadRange: number = 3;
+    private preloadRange = 3;
 
     /** 滚动监听器 */
     private scrollHandler: (() => void) | null = null;
@@ -46,7 +46,7 @@ export class WebtoonMode extends BaseReadingMode {
     private scrollDebounceTimer: number | null = null;
 
     /** 上一次的页码索引，用于避免重复触发回调 */
-    private lastReportedIndex: number = -1;
+    private lastReportedIndex = -1;
 
     protected setupContainer(): void {
         if (!this.container) return;

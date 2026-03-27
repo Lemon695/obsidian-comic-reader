@@ -8,13 +8,18 @@ export type {
     ComicInfo,
     PageInfo,
     ComicData,
-    MangaFileInfo
+    MangaFileInfo,
+    ComicSource,
+    ExternalComicSource,
+    VaultComicSource
 } from './comic';
 
 export {
     getComicFormat,
     isSupportedImage,
-    SUPPORTED_IMAGE_EXTENSIONS
+    SUPPORTED_IMAGE_EXTENSIONS,
+    getComicSourceKey,
+    canReopenComicSource
 } from './comic';
 
 // 阅读器相关类型

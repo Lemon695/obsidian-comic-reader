@@ -72,7 +72,7 @@ interface ListenerInfo<T> {
  */
 export class EventBus {
     private listeners: Map<keyof EventMap, Set<ListenerInfo<unknown>>> = new Map();
-    private debugMode: boolean = false;
+    private debugMode = false;
 
     /**
      * 启用或禁用调试模式
@@ -101,7 +101,10 @@ export class EventBus {
             once: false
         };
 
-        this.listeners.get(event)!.add(listenerInfo as ListenerInfo<unknown>);
+        const listeners = this.listeners.get(event);
+        if (listeners) {
+            listeners.add(listenerInfo as ListenerInfo<unknown>);
+        }
 
         if (this.debugMode) {
             console.log(`[EventBus] Subscribed to: ${String(event)}`);
@@ -131,7 +134,10 @@ export class EventBus {
             once: true
         };
 
-        this.listeners.get(event)!.add(listenerInfo as ListenerInfo<unknown>);
+        const listeners = this.listeners.get(event);
+        if (listeners) {
+            listeners.add(listenerInfo as ListenerInfo<unknown>);
+        }
 
         if (this.debugMode) {
             console.log(`[EventBus] Subscribed once to: ${String(event)}`);

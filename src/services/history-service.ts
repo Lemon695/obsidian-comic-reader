@@ -163,7 +163,7 @@ export class HistoryService {
     /**
      * 获取最近阅读的记录
      */
-    getRecent(count: number = 10): HistoryItem[] {
+    getRecent(count = 10): HistoryItem[] {
         return this.history.slice(0, count);
     }
 

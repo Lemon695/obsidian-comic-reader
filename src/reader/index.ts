@@ -1,30 +1,43 @@
-import { Plugin, Setting } from 'obsidian';
+import { Setting } from 'obsidian';
 import { MANGA_VIEW_TYPE } from '../constants';
-import { ComicSettings, ProgressEntry } from '../core/types';
+import type ComicReaderPlugin from '../main';
+import type { PluginModule } from '../core/types';
 import { t } from '../i18n/locale';
 import { commandsI18n } from '../i18n/reader/commands';
 import { settingsI18n } from '../i18n/reader/settings';
-import { historyI18n } from '../i18n/reader/history';
+import { readerModuleI18n } from '../i18n/reader/module';
 import { ImageManager } from './image-manager';
 import { MangaReaderView } from './view';
-import { HistoryModal } from './history-modal';
-import { getRecentHistory } from './parser';
+import { ComicSourceService, FileService } from '../services';
+import type { Bookmark } from '../types/reader';
+import type { ComicSource } from '../types/comic';
+import { getComicSourceKey } from '../types/comic';
 
-// Minimal interface to avoid circular dependency with main.ts
-interface ComicPlugin extends Plugin {
-	settings: ComicSettings;
-	saveSettings(): Promise<void>;
-	getProgress(fileName: string): ProgressEntry | undefined;
-	saveProgress(fileName: string, entry: ProgressEntry): Promise<void>;
-	deleteProgress(fileName: string): Promise<void>;
+interface OpenComicOptions {
+	source?: ComicSource;
+	startPage?: number;
 }
 
-export class ReaderModule {
-	constructor(private plugin: ComicPlugin) {}
+export class ReaderModule implements PluginModule {
+	readonly id = 'reader';
+	private readonly fileService: FileService;
+	private readonly sourceService: ComicSourceService;
+
+	constructor(private readonly plugin: ComicReaderPlugin) {
+		this.fileService = new FileService(plugin.app);
+		this.sourceService = new ComicSourceService(plugin.app);
+	}
+
+	get name(): string {
+		return t(readerModuleI18n, this.plugin.settings.ui.language).name;
+	}
+
+	get description(): string {
+		return t(readerModuleI18n, this.plugin.settings.ui.language).description;
+	}
 
 	onload(): void {
-		const cmdI18n = t(commandsI18n);
-		const histI18n = t(historyI18n);
+		const cmdI18n = t(commandsI18n, this.plugin.settings.ui.language);
 
 		this.plugin.registerView(
 			MANGA_VIEW_TYPE,
@@ -34,6 +47,8 @@ export class ReaderModule {
 				this.plugin.settings.reader,
 				(fileName) => this.plugin.getProgress(fileName),
 				(fileName, entry) => this.plugin.saveProgress(fileName, entry),
+				(fileName, pageIndex) => this.createBookmark(fileName, pageIndex),
+				this.plugin.settings.ui.language,
 			)
 		);
 
@@ -44,12 +59,6 @@ export class ReaderModule {
 		});
 
 		this.plugin.addRibbonIcon('book-open', cmdI18n.ribbonTooltip, () => this.openFileAndLoad());
-
-		this.plugin.addCommand({
-			id: 'view-reading-history',
-			name: histI18n.commandName,
-			callback: () => this.openHistoryModal(),
-		});
 	}
 
 	onunload(): void {
@@ -57,9 +66,7 @@ export class ReaderModule {
 	}
 
 	renderSettings(containerEl: HTMLElement): void {
-		const i18n = t(settingsI18n);
-
-		containerEl.createEl('h2', { text: i18n.sectionTitle });
+		const i18n = t(settingsI18n, this.plugin.settings.ui.language);
 
 		new Setting(containerEl)
 			.setName(i18n.thumbnailCount.name)
@@ -89,53 +96,59 @@ export class ReaderModule {
 			);
 	}
 
-	private openHistoryModal(): void {
-		const entries = getRecentHistory(this.plugin.settings.history);
-		new HistoryModal(
-			this.plugin.app,
-			entries,
-			(fileName) => this.plugin.deleteProgress(fileName),
-		).open();
+	async openFileAndLoad(): Promise<void> {
+		const handle = await this.fileService.requestExternalFileAccess();
+		if (!handle) return;
+
+		const file = await this.fileService.getFileFromHandle(handle);
+		if (!file) return;
+
+		await this.openMangaViewFromFile(file, {
+			source: this.sourceService.createExternalSource(file.name),
+		});
 	}
 
-	private async openFileAndLoad(): Promise<void> {
-		try {
-			const i18n = t(commandsI18n);
-			const fileHandle = await window.showOpenFilePicker({
-				types: [{
-					description: i18n.filePickerDesc,
-					accept: { 'application/zip': ['.zip'] },
-				}],
-			});
+	async openMangaViewFromFile(file: File, options?: OpenComicOptions): Promise<void> {
+		const source = options?.source;
+		const entryKey = source ? getComicSourceKey(source) : file.name;
 
-			if (fileHandle?.[0]) {
-				const file = await fileHandle[0].getFile();
-				await this.openMangaView(file);
-			}
-		} catch (error) {
-			// User cancelled the file picker — no action needed
-		}
-	}
-
-	private async openMangaView(file: File): Promise<void> {
 		// 记录打开时间（保留已有页码）
-		const existing = this.plugin.getProgress(file.name);
-		await this.plugin.saveProgress(file.name, {
+		const existing = this.plugin.getProgress(entryKey);
+		await this.plugin.saveProgress(entryKey, {
 			page: existing?.page ?? 0,
 			total: existing?.total ?? 0,
 			openedAt: Date.now(),
+			fileName: file.name,
+			source,
 		});
 
 		const workspace = this.plugin.app.workspace;
-		const leaf = workspace.getLeaf('split', 'vertical');
+		const leaf = workspace.getLeaf(true);
 
 		await leaf.setViewState({ type: MANGA_VIEW_TYPE });
 
 		const view = leaf.view as MangaReaderView;
 		if (view) {
-			await view.setState({ file });
+			await view.setState({
+				file,
+				entryKey,
+				source,
+				startPage: options?.startPage,
+			});
 		}
 
 		workspace.revealLeaf(leaf);
+	}
+
+	private async createBookmark(fileName: string, pageIndex: number, source?: ComicSource): Promise<void> {
+		const bookmark: Bookmark = {
+			id: `bookmark_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+			comicPath: fileName,
+			comicName: fileName,
+			pageIndex,
+			createdAt: Date.now(),
+			source,
+		};
+		await this.plugin.addBookmark(bookmark);
 	}
 }

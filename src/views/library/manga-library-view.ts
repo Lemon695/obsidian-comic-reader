@@ -2,11 +2,13 @@
  * 漫画库视图
  */
 
-import { ItemView, TFile, WorkspaceLeaf, setIcon } from 'obsidian';
+import { ItemView, WorkspaceLeaf, setIcon } from 'obsidian';
 import { MANGA_LIBRARY_VIEW_TYPE } from '../../constants';
-import { FileService } from '../../services';
-import type { MangaFileInfo, Settings } from '../../types';
+import { ComicSourceService, FileService } from '../../services';
+import type { MangaFileInfo } from '../../types';
 import type MangaReaderPlugin from '../../main';
+import { t } from '../../i18n/locale';
+import { libraryViewI18n } from '../../i18n/library/view';
 
 type SortField = 'name' | 'size' | 'mtime' | 'lastRead';
 type SortOrder = 'asc' | 'desc';
@@ -17,6 +19,7 @@ type SortOrder = 'asc' | 'desc';
 export class MangaLibraryView extends ItemView {
     private plugin: MangaReaderPlugin;
     private fileService: FileService;
+    private sourceService: ComicSourceService;
     private mangaFiles: MangaFileInfo[] = [];
     private filteredFiles: MangaFileInfo[] = [];
     private searchInput: HTMLInputElement | null = null;
@@ -30,6 +33,7 @@ export class MangaLibraryView extends ItemView {
         super(leaf);
         this.plugin = plugin;
         this.fileService = new FileService(plugin.app);
+        this.sourceService = new ComicSourceService(plugin.app);
     }
 
     getViewType(): string {
@@ -37,7 +41,7 @@ export class MangaLibraryView extends ItemView {
     }
 
     getDisplayText(): string {
-        return '漫画库';
+        return t(libraryViewI18n, this.plugin.settings.ui.language).displayText;
     }
 
     getIcon(): string {
@@ -63,12 +67,13 @@ export class MangaLibraryView extends ItemView {
      */
     private createSearchBar(): void {
         if (!this.container) return;
+        const i18n = t(libraryViewI18n, this.plugin.settings.ui.language);
 
         const searchBar = this.container.createDiv({ cls: 'manga-library-search-bar' });
 
         this.searchInput = searchBar.createEl('input', {
             type: 'text',
-            placeholder: '搜索漫画...',
+            placeholder: i18n.searchPlaceholder,
             cls: 'manga-library-search-input'
         });
 
@@ -80,7 +85,7 @@ export class MangaLibraryView extends ItemView {
             cls: 'manga-library-refresh-button'
         });
         setIcon(refreshButton, 'refresh-cw');
-        refreshButton.createSpan({ text: ' 刷新' });
+        refreshButton.createSpan({ text: ` ${i18n.refresh}` });
 
         refreshButton.addEventListener('click', async () => {
             await this.loadMangaFiles();
@@ -92,6 +97,7 @@ export class MangaLibraryView extends ItemView {
      */
     private createTable(): void {
         if (!this.container) return;
+        const i18n = t(libraryViewI18n, this.plugin.settings.ui.language);
 
         const tableContainer = this.container.createDiv({ cls: 'manga-library-table-container' });
         const table = tableContainer.createEl('table', { cls: 'manga-library-table' });
@@ -99,10 +105,10 @@ export class MangaLibraryView extends ItemView {
         const thead = table.createEl('thead');
         this.tableHead = thead.createEl('tr');
 
-        this.createSortableHeader('文件名', 'name');
-        this.createSortableHeader('大小', 'size');
-        this.createSortableHeader('最近添加', 'mtime');
-        this.createSortableHeader('最近阅读', 'lastRead');
+        this.createSortableHeader(i18n.headers.name, 'name');
+        this.createSortableHeader(i18n.headers.size, 'size');
+        this.createSortableHeader(i18n.headers.mtime, 'mtime');
+        this.createSortableHeader(i18n.headers.lastRead, 'lastRead');
 
         this.tableBody = table.createEl('tbody');
     }
@@ -190,11 +196,12 @@ export class MangaLibraryView extends ItemView {
                 case 'mtime':
                     comparison = a.mtime - b.mtime;
                     break;
-                case 'lastRead':
+                case 'lastRead': {
                     const aLastRead = this.getLastReadTime(a.path);
                     const bLastRead = this.getLastReadTime(b.path);
                     comparison = aLastRead - bLastRead;
                     break;
+                }
             }
 
             return this.sortOrder === 'asc' ? comparison : -comparison;
@@ -207,7 +214,7 @@ export class MangaLibraryView extends ItemView {
     private getLastReadTime(path: string): number {
         const history = this.plugin.getHistory();
         const historyItem = history.find(
-            item => item.path === path || item.fileName === path.split('/').pop()
+            (item) => item.path === path || item.fileName === path.split('/').pop()
         );
         return historyItem?.lastOpened ?? 0;
     }
@@ -247,13 +254,14 @@ export class MangaLibraryView extends ItemView {
      */
     private renderTable(): void {
         if (!this.tableBody) return;
+        const i18n = t(libraryViewI18n, this.plugin.settings.ui.language);
 
         this.tableBody.empty();
 
         if (this.filteredFiles.length === 0) {
             const emptyRow = this.tableBody.createEl('tr');
             const emptyCell = emptyRow.createEl('td', {
-                text: this.mangaFiles.length === 0 ? '未找到漫画文件' : '没有匹配的结果',
+                text: this.mangaFiles.length === 0 ? i18n.noFiles : i18n.noResults,
                 attr: { colspan: '4' }
             });
             emptyCell.style.textAlign = 'center';
@@ -271,7 +279,7 @@ export class MangaLibraryView extends ItemView {
 
             const lastReadTime = this.getLastReadTime(file.path);
             row.createEl('td', {
-                text: lastReadTime ? this.formatDate(lastReadTime) : '未阅读',
+                text: lastReadTime ? this.formatDate(lastReadTime) : i18n.unread,
                 cls: lastReadTime ? '' : 'text-muted'
             });
 
@@ -311,10 +319,12 @@ export class MangaLibraryView extends ItemView {
         try {
             const file = await this.fileService.readVaultFile(fileInfo.path);
             if (!file) {
-                throw new Error('文件不存在');
+                throw new Error(t(libraryViewI18n, this.plugin.settings.ui.language).fileMissing);
             }
 
-            await this.plugin.openMangaViewFromFile(file);
+            await this.plugin.openMangaViewFromFile(file, {
+                source: this.sourceService.createVaultSource(fileInfo.path, fileInfo.name),
+            });
         } catch (error) {
             console.error('[MangaLibraryView] Error opening manga:', error);
         }

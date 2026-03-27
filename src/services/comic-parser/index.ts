@@ -6,6 +6,14 @@
 
 import { BaseComicParser } from './base-parser';
 import { ZipParser } from './zip-parser';
+import type { ComicFormat } from '../../types';
+
+const EXTENSION_MIME_MAP: Record<string, string> = {
+    zip: 'application/zip',
+    cbz: 'application/zip',
+    cbr: 'application/x-rar-compressed',
+    pdf: 'application/pdf',
+};
 
 /**
  * 解析器工厂类
@@ -129,4 +137,39 @@ export function isComicSupported(file: File): boolean {
 
 export function getSupportedComicExtensions(): string[] {
     return ComicParserFactory.getInstance().getSupportedExtensions();
+}
+
+export function isSupportedComicExtension(extension: string): boolean {
+    return getSupportedComicExtensions().includes(extension.toLowerCase());
+}
+
+export function getComicMimeType(format: ComicFormat | null): string {
+    switch (format) {
+        case 'zip':
+        case 'cbz':
+            return 'application/zip';
+        case 'cbr':
+            return 'application/x-rar-compressed';
+        case 'pdf':
+            return 'application/pdf';
+        default:
+            return 'application/octet-stream';
+    }
+}
+
+export function getSupportedComicPickerAccept(): Record<string, string[]> {
+    const accept: Record<string, string[]> = {};
+
+    for (const extension of getSupportedComicExtensions()) {
+        const mimeType = EXTENSION_MIME_MAP[extension];
+        if (!mimeType) continue;
+
+        if (!accept[mimeType]) {
+            accept[mimeType] = [];
+        }
+
+        accept[mimeType].push(`.${extension}`);
+    }
+
+    return accept;
 }

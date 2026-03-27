@@ -1,19 +1,23 @@
 import { App, Modal, Notice } from 'obsidian';
 import { t } from '../i18n/locale';
-import { historyI18n } from '../i18n/reader/history';
-import { HistoryEntry } from './parser';
+import type { Language } from '../types/settings';
+import { historyModalI18n } from '../i18n/history/modal';
+import type { HistoryEntry } from '../reader/parser';
+import { canReopenComicSource } from '../types/comic';
 
 export class HistoryModal extends Modal {
 	constructor(
 		app: App,
-		private entries: HistoryEntry[],
-		private onDelete: (fileName: string) => Promise<void>,
+		private readonly language: Language,
+		private readonly entries: HistoryEntry[],
+		private readonly onDelete: (entryKey: string) => Promise<void>,
+		private readonly onOpenEntry: (entryKey: string) => Promise<boolean>,
 	) {
 		super(app);
 	}
 
 	onOpen(): void {
-		const i18n = t(historyI18n);
+		const i18n = t(historyModalI18n, this.language);
 		const { contentEl } = this;
 		contentEl.empty();
 		contentEl.createEl('h2', { text: i18n.modalTitle });
@@ -32,7 +36,7 @@ export class HistoryModal extends Modal {
 	private renderEntry(
 		list: HTMLElement,
 		entry: HistoryEntry,
-		i18n: ReturnType<typeof t<typeof historyI18n['en']>>,
+		i18n: ReturnType<typeof t<typeof historyModalI18n['en']>>,
 	): void {
 		const li = list.createEl('li', { cls: 'comic-history-item' });
 
@@ -47,6 +51,14 @@ export class HistoryModal extends Modal {
 
 		const actions = li.createEl('div', { cls: 'comic-history-actions' });
 
+		if (canReopenComicSource(entry.source)) {
+			const openBtn = actions.createEl('button', { text: i18n.openEntry, cls: 'comic-history-btn' });
+			openBtn.addEventListener('click', async () => {
+				await this.onOpenEntry(entry.key);
+				this.close();
+			});
+		}
+
 		const copyBtn = actions.createEl('button', { text: i18n.copyFileName, cls: 'comic-history-btn' });
 		copyBtn.addEventListener('click', async () => {
 			await navigator.clipboard.writeText(entry.fileName);
@@ -55,7 +67,7 @@ export class HistoryModal extends Modal {
 
 		const deleteBtn = actions.createEl('button', { text: i18n.deleteEntry, cls: 'comic-history-btn mod-warning' });
 		deleteBtn.addEventListener('click', async () => {
-			await this.onDelete(entry.fileName);
+			await this.onDelete(entry.key);
 			li.remove();
 			if (list.children.length === 0) {
 				list.replaceWith(this.contentEl.createEl('p', { text: i18n.empty, cls: 'comic-history-empty' }));

@@ -31,16 +31,6 @@ export interface AppState {
     initialized: boolean;
 }
 
-/** 默认应用状态 */
-const DEFAULT_APP_STATE: AppState = {
-    reader: DEFAULT_READER_STATE,
-    settings: DEFAULT_SETTINGS,
-    history: [],
-    bookmarks: [],
-    progressMap: new Map(),
-    initialized: false
-};
-
 /** 状态变化回调 */
 type StateChangeCallback<T> = (newValue: T, oldValue: T) => void;
 
@@ -278,7 +268,10 @@ export class StateManager {
             this.subscribers.set(selector as StateSelector<unknown>, new Set());
         }
 
-        this.subscribers.get(selector as StateSelector<unknown>)!.add(callback as StateChangeCallback<unknown>);
+        const callbacks = this.subscribers.get(selector as StateSelector<unknown>);
+        if (callbacks) {
+            callbacks.add(callback as StateChangeCallback<unknown>);
+        }
 
         return () => {
             const callbacks = this.subscribers.get(selector as StateSelector<unknown>);

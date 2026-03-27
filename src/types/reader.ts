@@ -2,7 +2,7 @@
  * 阅读器相关类型定义
  */
 
-import type { ComicInfo } from './comic';
+import type { ComicInfo, ComicSource } from './comic';
 
 /** 阅读模式 */
 export type ReadingMode = 'single' | 'double' | 'webtoon';
@@ -61,6 +61,8 @@ export interface Bookmark {
     note?: string;
     /** 缩略图（Base64） */
     thumbnail?: string;
+    /** 漫画来源 */
+    source?: ComicSource;
 }
 
 /** 阅读进度 */

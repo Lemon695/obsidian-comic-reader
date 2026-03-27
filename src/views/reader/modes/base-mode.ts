@@ -24,13 +24,13 @@ export abstract class BaseReadingMode {
     protected imageContainer: HTMLElement | null = null;
 
     /** 当前页码 */
-    protected currentIndex: number = 0;
+    protected currentIndex = 0;
 
     /** 总页数 */
-    protected totalPages: number = 0;
+    protected totalPages = 0;
 
     /** 是否已初始化 */
-    protected initialized: boolean = false;
+    protected initialized = false;
 
     /**
      * 初始化模式

@@ -4,7 +4,7 @@
 
 import JSZip from 'jszip';
 import { BaseComicParser } from './base-parser';
-import type { ComicData, PageInfo } from '../../types';
+import type { ComicData } from '../../types';
 import { isSupportedImage } from '../../types';
 
 /**
@@ -75,7 +75,7 @@ export class ZipParser extends BaseComicParser {
     /**
      * 获取缩略图
      */
-    async getThumbnail(index: number, size: number = 80): Promise<Blob> {
+    async getThumbnail(index: number, size = 80): Promise<Blob> {
         // 对于 ZIP 格式，直接返回原图
         // 缩略图的缩放由前端处理
         return this.getPage(index);

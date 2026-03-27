@@ -4,7 +4,7 @@
 
 import { App, PluginSettingTab, Setting } from 'obsidian';
 import type MangaReaderPlugin from '../../main';
-import type { Settings, ReadingMode, ThumbnailSize, Language } from '../../types';
+import type { ReadingMode, ThumbnailSize, Language } from '../../types';
 
 /**
  * 插件设置标签页

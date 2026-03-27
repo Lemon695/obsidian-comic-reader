@@ -6,6 +6,7 @@ interface NoticesStrings {
 	copyFailed: string;
 	noImagesFound: string;
 	loadError: string;
+	bookmarkAdded: string;
 }
 
 export const noticesI18n: I18nDict<NoticesStrings> = {
@@ -15,6 +16,7 @@ export const noticesI18n: I18nDict<NoticesStrings> = {
 		copyFailed: '复制图片失败',
 		noImagesFound: 'ZIP 文件中没有找到图片',
 		loadError: '加载 ZIP 文件出错',
+		bookmarkAdded: '书签已添加',
 	},
 	en: {
 		noImageToCopy: 'No image to copy',
@@ -22,5 +24,6 @@ export const noticesI18n: I18nDict<NoticesStrings> = {
 		copyFailed: 'Failed to copy image',
 		noImagesFound: 'No images found in ZIP file',
 		loadError: 'Error loading ZIP file',
+		bookmarkAdded: 'Bookmark added',
 	},
 };

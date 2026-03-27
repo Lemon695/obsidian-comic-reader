@@ -38,11 +38,11 @@ export class MangaReaderView extends ItemView {
     private modes: Map<ReadingMode, BaseReadingMode> = new Map();
 
     // 状态
-    private currentIndex: number = 0;
+    private currentIndex = 0;
     private currentFile: File | null = null;
     private currentImageUrl: string | null = null;
     private currentBlob: Blob | null = null;
-    private currentZoom: number = 100;
+    private currentZoom = 100;
 
     constructor(leaf: WorkspaceLeaf) {
         super(leaf);
@@ -203,7 +203,10 @@ export class MangaReaderView extends ItemView {
 
         // 鼠标移动显示缩略图栏
         this.registerDomEvent(this.container, 'mousemove', (e: MouseEvent) => {
-            const rect = this.container!.getBoundingClientRect();
+            if (!this.container) {
+                return;
+            }
+            const rect = this.container.getBoundingClientRect();
             const threshold = 100;
 
             if (e.clientY > rect.bottom - threshold) {
@@ -549,7 +552,6 @@ export class MangaReaderView extends ItemView {
             });
         } else {
             // 单页模式：调整图片宽度
-            const imageContainer = this.container.querySelector('.single-image-container') as HTMLElement;
             const images = this.container.querySelectorAll('.single-page-image');
             images.forEach((img) => {
                 const imgEl = img as HTMLImageElement;

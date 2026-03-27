@@ -5,9 +5,11 @@
 import { App, TFile, TFolder, Vault } from 'obsidian';
 import type { MangaFileInfo, ComicFormat } from '../types';
 import { getComicFormat } from '../types';
-
-/** 支持的漫画文件扩展名（目前只支持 ZIP/CBZ） */
-const SUPPORTED_EXTENSIONS = ['zip', 'cbz'];
+import {
+    getComicMimeType,
+    getSupportedComicPickerAccept,
+    isSupportedComicExtension,
+} from './comic-parser';
 
 /**
  * 文件服务类
@@ -26,20 +28,13 @@ export class FileService {
      * @returns 文件句柄，如果取消则返回 null
      */
     async requestExternalFileAccess(
-        acceptedFormats: ComicFormat[] = ['zip', 'cbz', 'cbr']
+        acceptedFormats?: ComicFormat[]
     ): Promise<FileSystemFileHandle | null> {
         try {
-            const accept: Record<string, string[]> = {};
-
-            if (acceptedFormats.includes('zip') || acceptedFormats.includes('cbz')) {
-                accept['application/zip'] = ['.zip', '.cbz'];
-            }
-            if (acceptedFormats.includes('cbr')) {
-                accept['application/x-rar-compressed'] = ['.cbr'];
-            }
-            if (acceptedFormats.includes('pdf')) {
-                accept['application/pdf'] = ['.pdf'];
-            }
+            const allAccept = getSupportedComicPickerAccept();
+            const accept = acceptedFormats?.length
+                ? this.filterAcceptMap(allAccept, acceptedFormats)
+                : allAccept;
 
             const handles = await window.showOpenFilePicker({
                 types: [{
@@ -106,7 +101,7 @@ export class FileService {
      */
     async scanMangaFiles(
         folderPath: string,
-        recursive: boolean = true
+        recursive = true
     ): Promise<MangaFileInfo[]> {
         const files: MangaFileInfo[] = [];
         const folder = this.app.vault.getAbstractFileByPath(folderPath);
@@ -137,7 +132,7 @@ export class FileService {
      * 检查文件扩展名是否为支持的格式
      */
     isSupportedFormat(extension: string): boolean {
-        return SUPPORTED_EXTENSIONS.includes(extension.toLowerCase());
+        return isSupportedComicExtension(extension);
     }
 
     /**
@@ -156,17 +151,24 @@ export class FileService {
      * 获取文件的 MIME 类型
      */
     private getMimeType(format: ComicFormat | null): string {
-        switch (format) {
-            case 'zip':
-            case 'cbz':
-                return 'application/zip';
-            case 'cbr':
-                return 'application/x-rar-compressed';
-            case 'pdf':
-                return 'application/pdf';
-            default:
-                return 'application/octet-stream';
+        return getComicMimeType(format);
+    }
+
+    private filterAcceptMap(
+        acceptMap: Record<string, string[]>,
+        acceptedFormats: ComicFormat[]
+    ): Record<string, string[]> {
+        const allowedExtensions = new Set(acceptedFormats.map((format) => `.${format}`));
+        const filtered: Record<string, string[]> = {};
+
+        for (const [mimeType, extensions] of Object.entries(acceptMap)) {
+            const matched = extensions.filter((extension) => allowedExtensions.has(extension));
+            if (matched.length > 0) {
+                filtered[mimeType] = matched;
+            }
         }
+
+        return filtered;
     }
 
     /**

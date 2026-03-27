@@ -21,9 +21,9 @@ export class ImageService {
     private cache: Map<number, CacheItem> = new Map();
     private preloadQueue: Set<number> = new Set();
     private maxCacheSize: number;
-    private isPreloading: boolean = false;
+    private isPreloading = false;
 
-    constructor(eventBus?: EventBus, maxCacheSize: number = 100) {
+    constructor(eventBus?: EventBus, maxCacheSize = 100) {
         this.eventBus = eventBus ?? getEventBus();
         this.maxCacheSize = maxCacheSize; // MB
     }
@@ -115,7 +115,7 @@ export class ImageService {
      * @param currentIndex - 当前页面索引
      * @param range - 预加载范围（前后各多少页）
      */
-    async preloadAround(currentIndex: number, range: number = 3): Promise<void> {
+    async preloadAround(currentIndex: number, range = 3): Promise<void> {
         if (!this.parser) return;
 
         const pageCount = this.parser.getPageCount();
@@ -147,7 +147,7 @@ export class ImageService {
      * @param size - 缩略图大小
      * @returns 缩略图 Blob URL
      */
-    async getThumbnail(index: number, size: number = 80): Promise<string> {
+    async getThumbnail(index: number, size = 80): Promise<string> {
         if (!this.parser) {
             throw new Error('No parser set');
         }
@@ -272,7 +272,9 @@ export class ImageService {
                 .sort((a, b) => a[1].timestamp - b[1].timestamp);
 
             while (totalSize > maxBytes * 0.8 && entries.length > 0) {
-                const [key, item] = entries.shift()!;
+                const oldestEntry = entries.shift();
+                if (!oldestEntry) break;
+                const [key, item] = oldestEntry;
                 URL.revokeObjectURL(item.url);
                 this.cache.delete(key);
                 totalSize -= item.blob.size;

@@ -35,7 +35,7 @@ export class Toolbar {
     private modeSwitchEl: HTMLButtonElement | null = null;
     private zoomInfoEl: HTMLElement | null = null;
     private currentMode: ReadingMode = 'single';
-    private currentZoom: number = 100;
+    private currentZoom = 100;
     private onModeChangeCallback: ((mode: ReadingMode) => void) | null = null;
     private onZoomChangeCallback: ((zoom: number) => void) | null = null;
 

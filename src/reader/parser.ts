@@ -1,5 +1,6 @@
 import JSZip from 'jszip';
 import { HistoryMap, ProgressEntry } from '../core/types';
+import type { ComicSource } from '../types/comic';
 
 export function isImageFile(filename: string): boolean {
 	return /\.(jpg|jpeg|png|gif|webp)$/i.test(filename);
@@ -39,33 +40,37 @@ export function getThumbnailRange(current: number, total: number, count: number)
 export const HISTORY_MAX = 20;
 
 export interface HistoryEntry {
+	key: string;
 	fileName: string;
 	page: number;
 	total: number;
 	openedAt: number;
 	percent: number;  // 0–100，四舍五入
+	source?: ComicSource;
 }
 
 /** 从 HistoryMap 提取最近 HISTORY_MAX 条，按 openedAt 降序 */
-export function getRecentHistory(history: HistoryMap): HistoryEntry[] {
+export function getRecentHistory(history: HistoryMap, limit: number = HISTORY_MAX): HistoryEntry[] {
 	return Object.entries(history)
-		.map(([fileName, entry]: [string, ProgressEntry]) => ({
-			fileName,
+		.map(([key, entry]: [string, ProgressEntry]) => ({
+			key,
+			fileName: entry.fileName ?? key,
 			page: entry.page,
 			total: entry.total,
 			openedAt: entry.openedAt,
 			percent: entry.total > 0 ? Math.round(((entry.page + 1) / entry.total) * 100) : 0,
+			source: entry.source,
 		}))
 		.sort((a, b) => b.openedAt - a.openedAt)
-		.slice(0, HISTORY_MAX);
+		.slice(0, limit);
 }
 
 /** 裁剪超出限额的旧条目，返回更新后的 HistoryMap */
-export function pruneHistory(history: HistoryMap): HistoryMap {
+export function pruneHistory(history: HistoryMap, limit: number = HISTORY_MAX): HistoryMap {
 	const entries = Object.entries(history) as [string, ProgressEntry][];
-	if (entries.length <= HISTORY_MAX) return history;
+	if (entries.length <= limit) return history;
 	const kept = entries
 		.sort(([, a], [, b]) => b.openedAt - a.openedAt)
-		.slice(0, HISTORY_MAX);
+		.slice(0, limit);
 	return Object.fromEntries(kept);
 }

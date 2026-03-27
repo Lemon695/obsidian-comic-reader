@@ -1,9 +1,9 @@
-import { I18nDict } from '../locale';
+import type { I18nDict } from '../locale';
 
-interface HistoryStrings {
-	commandName: string;
+interface HistoryModalI18n {
 	modalTitle: string;
 	empty: string;
+	openEntry: string;
 	copyFileName: string;
 	deleteEntry: string;
 	percentLabel: string;
@@ -11,11 +11,11 @@ interface HistoryStrings {
 	fileNameCopied: string;
 }
 
-export const historyI18n: I18nDict<HistoryStrings> = {
+export const historyModalI18n: I18nDict<HistoryModalI18n> = {
 	zh: {
-		commandName: '查看阅读历史',
 		modalTitle: '阅读历史',
 		empty: '暂无阅读记录',
+		openEntry: '打开',
 		copyFileName: '复制文件名',
 		deleteEntry: '删除',
 		percentLabel: '进度 {percent}%',
@@ -23,9 +23,9 @@ export const historyI18n: I18nDict<HistoryStrings> = {
 		fileNameCopied: '文件名已复制',
 	},
 	en: {
-		commandName: 'View Reading History',
 		modalTitle: 'Reading History',
 		empty: 'No reading history yet',
+		openEntry: 'Open',
 		copyFileName: 'Copy filename',
 		deleteEntry: 'Delete',
 		percentLabel: '{percent}% read',

@@ -5,6 +5,19 @@
 /** 支持的漫画格式 */
 export type ComicFormat = 'zip' | 'cbz' | 'cbr' | 'pdf';
 
+export interface ExternalComicSource {
+    kind: 'external';
+    fileName: string;
+}
+
+export interface VaultComicSource {
+    kind: 'vault';
+    path: string;
+    fileName: string;
+}
+
+export type ComicSource = ExternalComicSource | VaultComicSource;
+
 /** 漫画信息 */
 export interface ComicInfo {
     /** 文件路径 */
@@ -51,6 +64,14 @@ export interface MangaFileInfo {
     size: number;
     /** 修改时间戳 */
     mtime: number;
+}
+
+export function getComicSourceKey(source: ComicSource): string {
+    return source.kind === 'vault' ? source.path : source.fileName;
+}
+
+export function canReopenComicSource(source: ComicSource | undefined): source is VaultComicSource {
+    return source?.kind === 'vault';
 }
 
 /** 根据文件扩展名获取漫画格式 */

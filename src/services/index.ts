@@ -4,6 +4,7 @@
 
 // 文件服务
 export { FileService } from './file-service';
+export { ComicSourceService } from './comic-source-service';
 
 // 存储服务
 export { StorageService } from './storage-service';

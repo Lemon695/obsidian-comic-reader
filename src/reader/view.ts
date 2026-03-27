@@ -5,15 +5,22 @@ import { ProgressEntry, ReaderSettings } from '../core/types';
 import { t } from '../i18n/locale';
 import { noticesI18n } from '../i18n/reader/notices';
 import { contextMenuI18n } from '../i18n/reader/context-menu';
+import { readerViewI18n } from '../i18n/reader/view';
 import { ImageManager } from './image-manager';
 import { extractImages, getThumbnailRange } from './parser';
+import type { Language } from '../types/settings';
+import type { ComicSource } from '../types/comic';
 
 interface MangaViewState {
 	file: File;
+	entryKey?: string;
+	source?: ComicSource;
+	startPage?: number;
 }
 
 type ProgressGetter = (fileName: string) => ProgressEntry | undefined;
 type ProgressSaver = (fileName: string, entry: ProgressEntry) => Promise<void>;
+type BookmarkAdder = (fileName: string, pageIndex: number, source?: ComicSource) => Promise<void>;
 
 export class MangaReaderView extends ItemView {
 	private currentIndex = 0;
@@ -25,6 +32,9 @@ export class MangaReaderView extends ItemView {
 	private pageInfo: HTMLDivElement;
 	private zipInstance: JSZip | null = null;
 	private saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+	private currentEntryKey: string | null = null;
+	private currentSource: ComicSource | undefined;
+	private pendingStartPage: number | undefined;
 
 	constructor(
 		leaf: WorkspaceLeaf,
@@ -32,6 +42,8 @@ export class MangaReaderView extends ItemView {
 		private settings: ReaderSettings,
 		private getProgress: ProgressGetter,
 		private saveProgress: ProgressSaver,
+		private addBookmark: BookmarkAdder,
+		private language: Language = 'auto',
 	) {
 		super(leaf);
 	}
@@ -41,12 +53,15 @@ export class MangaReaderView extends ItemView {
 	}
 
 	getDisplayText(): string {
-		return 'Comic Reader';
+		return t(readerViewI18n, this.language).displayText;
 	}
 
 	async setState(state: MangaViewState): Promise<void> {
 		if (state?.file) {
 			this.currentFile = state.file;
+			this.currentEntryKey = state.entryKey ?? state.file.name;
+			this.currentSource = state.source;
+			this.pendingStartPage = state.startPage;
 			await this.loadManga(state.file);
 		}
 	}
@@ -125,16 +140,21 @@ export class MangaReaderView extends ItemView {
 			this.images = extractImages(zipContent, this.settings.sortOrder);
 
 			if (this.images.length > 0) {
-				const saved = this.getProgress(file.name);
-				const startIndex = (saved && saved.page < this.images.length) ? saved.page : 0;
+				const progressKey = this.currentEntryKey ?? file.name;
+				const saved = this.getProgress(progressKey);
+				const preferredPage = this.pendingStartPage;
+				const startIndex = typeof preferredPage === 'number'
+					? Math.max(0, Math.min(preferredPage, this.images.length - 1))
+					: (saved && saved.page < this.images.length ? saved.page : 0);
+				this.pendingStartPage = undefined;
 				await this.showImage(startIndex);
 			} else {
-				const notices = t(noticesI18n);
+				const notices = t(noticesI18n, this.language);
 				(this.containerEl.children[1] as HTMLElement).setText(notices.noImagesFound);
 			}
 		} catch (error) {
 			console.error('Error loading comic:', error);
-			const notices = t(noticesI18n);
+			const notices = t(noticesI18n, this.language);
 			(this.containerEl.children[1] as HTMLElement).setText(notices.loadError);
 		}
 	}
@@ -173,10 +193,12 @@ export class MangaReaderView extends ItemView {
 		if (this.saveDebounceTimer) clearTimeout(this.saveDebounceTimer);
 		this.saveDebounceTimer = setTimeout(() => {
 			if (this.currentFile) {
-				this.saveProgress(this.currentFile.name, {
+				this.saveProgress(this.currentEntryKey ?? this.currentFile.name, {
 					page: this.currentIndex,
 					total: this.images.length,
 					openedAt: Date.now(),
+					fileName: this.currentFile.name,
+					source: this.currentSource,
 				});
 			}
 		}, 500);
@@ -223,7 +245,7 @@ export class MangaReaderView extends ItemView {
 
 	private showContextMenu(evt: MouseEvent): void {
 		const menu = new Menu();
-		const i18n = t(contextMenuI18n);
+		const i18n = t(contextMenuI18n, this.language);
 
 		menu.addItem((item) => {
 			item.setTitle(i18n.copyImage)
@@ -231,11 +253,21 @@ export class MangaReaderView extends ItemView {
 				.onClick(() => this.copyCurrentImage());
 		});
 
+		menu.addItem((item) => {
+			item.setTitle(i18n.addBookmark)
+				.setIcon('bookmark')
+				.onClick(() => {
+					this.addBookmarkFromCurrentPage().catch((error) => {
+						console.error('Add bookmark failed:', error);
+					});
+				});
+		});
+
 		menu.showAtPosition({ x: evt.x, y: evt.y });
 	}
 
 	private async copyCurrentImage(): Promise<void> {
-		const notices = t(noticesI18n);
+		const notices = t(noticesI18n, this.language);
 		const blob = this.imgManager.getCurrentBlob();
 
 		if (!blob) {
@@ -270,5 +302,12 @@ export class MangaReaderView extends ItemView {
 			console.error('Copy image failed:', error);
 			new Notice(notices.copyFailed);
 		}
+	}
+
+	private async addBookmarkFromCurrentPage(): Promise<void> {
+		if (!this.currentFile) return;
+		const notices = t(noticesI18n, this.language);
+		await this.addBookmark(this.currentFile.name, this.currentIndex, this.currentSource);
+		new Notice(notices.bookmarkAdded);
 	}
 }
